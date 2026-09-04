@@ -1,0 +1,88 @@
+{
+  "schema_version": "0.1-mvp",
+  "units": {
+    "cover": "normalized 0..1",
+    "mobility_modifier": "multiplier",
+    "elevation": "integer height level stored per tile, independent of terrain preset",
+    "tile_capacity": "sum of unit size values allowed on a tile"
+  },
+  "tile_rules": {
+    "capacity_size": 1000,
+    "size_formula": "footprint * height",
+    "elevation_is_independent_axis": true
+  },
+  "locomotion_classes_mvp": [
+    "infantry",
+    "tracked",
+    "walker",
+    "air"
+  ],
+  "terrain_presets": {
+    "open": {
+      "surface": "firm",
+      "cover": 0.0,
+      "mobility": {
+        "infantry": 1.0,
+        "tracked": 1.0,
+        "walker": 1.0,
+        "air": 1.0
+      },
+      "design_intent": "Baseline terrain; exposes intrinsic unit properties."
+    },
+    "road": {
+      "surface": "road",
+      "cover": 0.0,
+      "mobility": {
+        "infantry": 1.05,
+        "tracked": 1.25,
+        "walker": 1.1,
+        "air": 1.0
+      },
+      "design_intent": "Fast redeployment and predictable logistics/ambush corridors."
+    },
+    "vegetation": {
+      "surface": "vegetation",
+      "cover": 0.55,
+      "mobility": {
+        "infantry": 0.9,
+        "tracked": 0.65,
+        "walker": 0.8,
+        "air": 1.0
+      },
+      "design_intent": "Concealment/observation-limiting terrain that favors smaller units."
+    },
+    "ruins": {
+      "surface": "rubble",
+      "cover": 0.8,
+      "mobility": {
+        "infantry": 0.85,
+        "tracked": 0.45,
+        "walker": 0.7,
+        "air": 1.0
+      },
+      "design_intent": "Strong cover and fragmented geometry; penalizes heavy ground formations."
+    },
+    "soft_ground": {
+      "surface": "soft",
+      "cover": 0.15,
+      "mobility": {
+        "infantry": 0.7,
+        "tracked": 0.75,
+        "walker": 0.9,
+        "air": 1.0
+      },
+      "design_intent": "Route-shaping terrain; highlights locomotion differences."
+    },
+    "rough_ground": {
+      "surface": "rough",
+      "cover": 0.35,
+      "mobility": {
+        "infantry": 0.9,
+        "tracked": 0.65,
+        "walker": 0.85,
+        "air": 1.0
+      },
+      "design_intent": "Mixed tactical terrain with moderate protection and movement friction."
+    }
+  }
+}

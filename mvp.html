@@ -1,0 +1,1060 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>RTS Tactical Matrix MVP 0.1</title>
+<style>
+  :root{
+    --bg:#101419; --panel:#171d24; --panel2:#202832; --line:#34404c;
+    --text:#e8eef4; --muted:#96a5b3; --accent:#78b7ff; --good:#8fe39a;
+    --warn:#f1cb6a; --bad:#ff8b8b;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font:14px/1.35 system-ui,Segoe UI,Roboto,sans-serif;overflow:hidden}
+  button,select,input{font:inherit}
+  button,select,input[type=number],input[type=range]{
+    background:var(--panel2);color:var(--text);border:1px solid var(--line);border-radius:5px
+  }
+  button{padding:6px 10px;cursor:pointer}
+  button:hover{border-color:#6d8297}
+  button.active{outline:2px solid var(--accent);outline-offset:-2px}
+  #app{display:grid;grid-template-rows:auto 1fr;height:100%}
+  #topbar{
+    display:flex;gap:8px;align-items:center;padding:7px 9px;background:#0b0f13;border-bottom:1px solid var(--line);
+    white-space:nowrap;overflow-x:auto
+  }
+  #main{display:grid;grid-template-columns:minmax(640px,1fr) 340px;min-height:0}
+  #stageWrap{position:relative;min-width:0;min-height:0;background:#07090c;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  canvas{display:block;background:#171b20;box-shadow:0 0 0 1px #000;max-width:100%;max-height:100%;image-rendering:auto}
+  #side{background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:10px}
+  h2,h3{margin:6px 0 8px}
+  h2{font-size:16px}
+  h3{font-size:14px;color:#cbd7e2;border-top:1px solid var(--line);padding-top:9px;margin-top:12px}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0;align-items:center}
+  .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin:6px 0}
+  .label{color:var(--muted)}
+  .value{text-align:right}
+  .small{font-size:12px;color:var(--muted)}
+  .pill{display:inline-block;padding:2px 6px;border:1px solid var(--line);border-radius:10px;margin:2px 2px 2px 0;background:#11171d}
+  .bar{height:7px;background:#0d1115;border:1px solid #2b343d;border-radius:4px;overflow:hidden}
+  .bar>i{display:block;height:100%;background:#9fbad3}
+  .bar.hp>i{background:#9bd59f}.bar.sup>i{background:#e4be6a}.bar.ammo>i{background:#9fbad3}
+  .statgrid{display:grid;grid-template-columns:1fr auto;gap:3px 8px}
+  .sep{height:1px;background:var(--line);margin:8px 0}
+  #log{height:126px;overflow:auto;background:#0d1116;border:1px solid var(--line);padding:6px;font:11px/1.35 ui-monospace,SFMono-Regular,Consolas,monospace}
+  #hover{position:absolute;left:8px;bottom:8px;background:#0a0e12dd;border:1px solid var(--line);padding:5px 7px;border-radius:5px;pointer-events:none;font-size:12px}
+  #help{position:absolute;right:8px;bottom:8px;background:#0a0e12dd;border:1px solid var(--line);padding:6px 8px;border-radius:5px;pointer-events:none;font-size:11px;color:#c2ccd4;max-width:360px}
+  .control{display:flex;gap:5px;align-items:center}
+  .control input[type=range]{width:120px}
+  kbd{background:#252e38;border:1px solid #455463;border-bottom-width:2px;border-radius:3px;padding:0 4px}
+  @media(max-width:1000px){#main{grid-template-columns:1fr 300px}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <button id="pauseBtn">⏸ Pauza</button>
+    <button id="resetBtn">Reset</button>
+    <button id="aiBtn" class="active">AI: ON</button>
+    <span class="control">Widoczność
+      <input id="visibility" type="range" min="0.25" max="1" step="0.05" value="1">
+      <span id="visibilityVal">1.00</span>
+    </span>
+    <span class="control">Mobilność
+      <input id="mobility" type="range" min="0.45" max="1.15" step="0.05" value="1">
+      <span id="mobilityVal">1.00</span>
+    </span>
+    <button id="dayBtn" class="active">Dzień</button>
+    <button id="nightBtn">Noc</button>
+    <button id="gridBtn" class="active">Siatka</button>
+    <button id="debugBtn">Debug</button>
+  </div>
+
+  <div id="main">
+    <div id="stageWrap">
+      <canvas id="game" width="1152" height="768"></canvas>
+      <div id="hover">—</div>
+      <div id="help">
+        <b>Sterowanie:</b> LPM wybór • Shift+LPM wielokrotny • przeciągnięcie LPM ramka • PPM ruch / atak<br>
+        <kbd>A</kbd> agresywna • <kbd>D</kbd> obronna • <kbd>P</kbd> pasywna • <kbd>C</kbd> skryta • <kbd>E</kbd> emisja • <kbd>F</kbd> kolejna formacja
+      </div>
+    </div>
+
+    <aside id="side">
+      <h2>RTS Tactical Matrix MVP 0.1</h2>
+      <div class="small">Sandbox do walidacji: teren × geometria × informacja × zachowanie × ogień × supply.</div>
+
+      <h3>Zaznaczenie</h3>
+      <div id="selectionInfo" class="small">Brak zaznaczenia.</div>
+
+      <h3>Rozkaz grupowy</h3>
+      <div class="row">
+        <span class="label">Postawa</span>
+        <select id="stance">
+          <option value="aggressive">aggressive</option>
+          <option value="defensive">defensive</option>
+          <option value="passive">passive</option>
+          <option value="concealed">concealed</option>
+        </select>
+      </div>
+      <div class="row">
+        <span class="label">Formacja</span>
+        <select id="formation">
+          <option value="compact">compact</option>
+          <option value="line">line</option>
+          <option value="spread">spread</option>
+        </select>
+      </div>
+      <div class="row">
+        <span class="label">Spacing</span>
+        <input id="spacing" type="number" min="0.35" max="2.5" step="0.1" value="1.0">
+      </div>
+      <div class="row">
+        <span class="label">Frontage</span>
+        <input id="frontage" type="number" min="1" max="20" step="1" value="4">
+      </div>
+      <div class="row">
+        <span class="label">Ordering</span>
+        <select id="ordering">
+          <option value="balanced">balanced</option>
+          <option value="armor_front">armor_front</option>
+          <option value="scouts_front">scouts_front</option>
+          <option value="support_rear">support_rear</option>
+        </select>
+      </div>
+      <div class="row3">
+        <button id="emissionBtn">Emisja</button>
+        <button id="stopBtn">Stop</button>
+        <button id="retreatBtn">Odwrót</button>
+      </div>
+
+      <h3>Parametry pola pod kursorem</h3>
+      <div id="tileInfo" class="statgrid small"></div>
+
+      <h3>Tuning</h3>
+      <div class="small">Stałe użyte przez model. Są jawne w kodzie w obiekcie <code>TUNING</code>.</div>
+      <div id="tuningInfo" class="statgrid small"></div>
+
+      <h3>Log zdarzeń</h3>
+      <div id="log"></div>
+    </aside>
+  </div>
+</div>
+
+<script id="terrainData" type="application/json">{"schema_version": "0.1-mvp", "units": {"cover": "normalized 0..1", "mobility_modifier": "multiplier", "elevation": "integer height level stored per tile, independent of terrain preset", "tile_capacity": "sum of unit size values allowed on a tile"}, "tile_rules": {"capacity_size": 1000, "size_formula": "footprint * height", "elevation_is_independent_axis": true}, "locomotion_classes_mvp": ["infantry", "tracked", "walker", "air"], "terrain_presets": {"open": {"surface": "firm", "cover": 0.0, "mobility": {"infantry": 1.0, "tracked": 1.0, "walker": 1.0, "air": 1.0}, "design_intent": "Baseline terrain; exposes intrinsic unit properties."}, "road": {"surface": "road", "cover": 0.0, "mobility": {"infantry": 1.05, "tracked": 1.25, "walker": 1.1, "air": 1.0}, "design_intent": "Fast redeployment and predictable logistics/ambush corridors."}, "vegetation": {"surface": "vegetation", "cover": 0.55, "mobility": {"infantry": 0.9, "tracked": 0.65, "walker": 0.8, "air": 1.0}, "design_intent": "Concealment/observation-limiting terrain that favors smaller units."}, "ruins": {"surface": "rubble", "cover": 0.8, "mobility": {"infantry": 0.85, "tracked": 0.45, "walker": 0.7, "air": 1.0}, "design_intent": "Strong cover and fragmented geometry; penalizes heavy ground formations."}, "soft_ground": {"surface": "soft", "cover": 0.15, "mobility": {"infantry": 0.7, "tracked": 0.75, "walker": 0.9, "air": 1.0}, "design_intent": "Route-shaping terrain; highlights locomotion differences."}, "rough_ground": {"surface": "rough", "cover": 0.35, "mobility": {"infantry": 0.9, "tracked": 0.65, "walker": 0.85, "air": 1.0}, "design_intent": "Mixed tactical terrain with moderate protection and movement friction."}}}</script>
+<script id="unitData" type="application/json">{"schema_version": "0.1-mvp", "units": {"height": "abstract height units", "footprint": "abstract ground-area units", "size": "derived = footprint * height", "speed": "tiles per second before terrain modifiers", "baseSignature": "0..100, higher = easier to detect", "sensorStrength": "0..100", "sensorRange": "tiles", "sensorResolution": "0..100", "durability": "HP", "armorFront": "flat damage reduction", "armorOther": "flat damage reduction", "weaponRange": "tiles", "damage": "damage per hit before armor", "accuracy": "0..1", "suppressionPower": "suppression per hit/event, relative scale", "rateOfFire": "shots per second", "supplyCapacity": "generic supply units carried", "supplyState": "current generic supply units carried"}, "rules": {"size_formula": "footprint * height", "weight_model_mvp": "weight == size", "damage_formula": "max(0, damage - relevant_armor)", "supply_per_shot": 1, "emission": "runtime ON/OFF flag; defaults to false", "penetration": "not in MVP", "coverUsage": "not a unit stat; effective cover depends on terrain cover and unit size", "fuel": "not in MVP", "cohesion": "not in MVP", "assembly": "platform + weapon + specialization"}, "platforms": {"light_infantry": {"height": 1.8, "footprint": 1.0, "locomotionClass": "infantry", "speed": 1.05, "baseSignature": 18, "emission": false, "sensorStrength": 34, "sensorRange": 6, "sensorResolution": 34, "durability": 80, "armorFront": 0, "armorOther": 0, "supplyCapacity": 24}, "combat_infantry": {"height": 1.8, "footprint": 1.2, "locomotionClass": "infantry", "speed": 0.95, "baseSignature": 22, "emission": false, "sensorStrength": 30, "sensorRange": 5, "sensorResolution": 30, "durability": 100, "armorFront": 2, "armorOther": 1, "supplyCapacity": 32}, "light_tracked": {"height": 2.2, "footprint": 4.0, "locomotionClass": "tracked", "speed": 1.2, "baseSignature": 50, "emission": false, "sensorStrength": 30, "sensorRange": 7, "sensorResolution": 34, "durability": 220, "armorFront": 12, "armorOther": 6, "supplyCapacity": 48}, "heavy_walker": {"height": 5.0, "footprint": 9.0, "locomotionClass": "walker", "speed": 0.65, "baseSignature": 82, "emission": false, "sensorStrength": 36, "sensorRange": 8, "sensorResolution": 40, "durability": 500, "armorFront": 28, "armorOther": 14, "supplyCapacity": 56}, "air_drone": {"height": 8.0, "footprint": 1.5, "locomotionClass": "air", "speed": 2.2, "baseSignature": 36, "emission": false, "sensorStrength": 46, "sensorRange": 10, "sensorResolution": 58, "durability": 100, "armorFront": 2, "armorOther": 2, "supplyCapacity": 18}}, "weapons": {"carbine": {"weaponRange": 4, "damage": 16, "accuracy": 0.66, "suppressionPower": 8, "rateOfFire": 1.5}, "rifle": {"weaponRange": 6, "damage": 20, "accuracy": 0.7, "suppressionPower": 10, "rateOfFire": 1.0}, "machine_gun": {"weaponRange": 6, "damage": 12, "accuracy": 0.56, "suppressionPower": 26, "rateOfFire": 4.0}, "autocannon": {"weaponRange": 8, "damage": 30, "accuracy": 0.65, "suppressionPower": 18, "rateOfFire": 2.0}, "heavy_cannon": {"weaponRange": 10, "damage": 60, "accuracy": 0.72, "suppressionPower": 35, "rateOfFire": 0.4}, "none": {"weaponRange": 0, "damage": 0, "accuracy": 0.0, "suppressionPower": 0, "rateOfFire": 0.0}}, "specializations": {"recon_package": {"add": {"sensorStrength": 20, "sensorRange": 2, "sensorResolution": 24}, "multiply": {"baseSignature": 0.8}}, "armor_package": {"add": {"armorFront": 4, "armorOther": 2}, "multiply": {"durability": 1.25, "speed": 0.9, "baseSignature": 1.1}}, "ammo_package": {"add": {}, "multiply": {"supplyCapacity": 1.8, "baseSignature": 1.05}}, "signature_reduction_package": {"add": {}, "multiply": {"baseSignature": 0.65}}, "fire_control_package": {"add": {"accuracy": 0.08}, "multiply": {"baseSignature": 1.04}}, "cargo_package": {"add": {"supplyCapacity": 220}, "multiply": {"speed": 0.9, "baseSignature": 1.1}}}, "test_configurations": {"recon_infantry": {"platform": "light_infantry", "weapon": "carbine", "specialization": "recon_package", "test_role": "Low-signature observer that can survive light contact but should avoid line combat."}, "line_infantry": {"platform": "combat_infantry", "weapon": "rifle", "specialization": "armor_package", "test_role": "General-purpose infantry configuration for open/covered line fighting."}, "suppression_infantry": {"platform": "combat_infantry", "weapon": "machine_gun", "specialization": "ammo_package", "test_role": "High sustained suppression at the cost of rapid supply expenditure."}, "tracked_raider": {"platform": "light_tracked", "weapon": "autocannon", "specialization": "signature_reduction_package", "test_role": "Fast ground platform for flanking, ambushes and attacks on logistics."}, "assault_walker": {"platform": "heavy_walker", "weapon": "heavy_cannon", "specialization": "fire_control_package", "test_role": "Heavy breakthrough platform with strong frontal armor, long reach and poor concealment."}, "recon_drone": {"platform": "air_drone", "weapon": "none", "specialization": "recon_package", "test_role": "Fast long-range observation platform; tests air locomotion and information warfare."}, "tracked_supply_carrier": {"platform": "light_tracked", "weapon": "none", "specialization": "cargo_package", "test_role": "Physical, destructible supply node using the same chassis as the raider."}}, "resolved_test_units": {"recon_infantry": {"height": 1.8, "footprint": 1.0, "locomotionClass": "infantry", "speed": 1.05, "baseSignature": 14.4, "emission": false, "sensorStrength": 54, "sensorRange": 8, "sensorResolution": 58, "durability": 80, "armorFront": 0, "armorOther": 0, "supplyCapacity": 24, "weaponRange": 4, "damage": 16, "accuracy": 0.66, "suppressionPower": 8, "rateOfFire": 1.5, "size": 1.8, "weight": 1.8, "supplyState": 24}, "line_infantry": {"height": 1.8, "footprint": 1.2, "locomotionClass": "infantry", "speed": 0.855, "baseSignature": 24.2, "emission": false, "sensorStrength": 30, "sensorRange": 5, "sensorResolution": 30, "durability": 125.0, "armorFront": 6, "armorOther": 3, "supplyCapacity": 32, "weaponRange": 6, "damage": 20, "accuracy": 0.7, "suppressionPower": 10, "rateOfFire": 1.0, "size": 2.16, "weight": 2.16, "supplyState": 32}, "suppression_infantry": {"height": 1.8, "footprint": 1.2, "locomotionClass": "infantry", "speed": 0.95, "baseSignature": 23.1, "emission": false, "sensorStrength": 30, "sensorRange": 5, "sensorResolution": 30, "durability": 100, "armorFront": 2, "armorOther": 1, "supplyCapacity": 57.6, "weaponRange": 6, "damage": 12, "accuracy": 0.56, "suppressionPower": 26, "rateOfFire": 4.0, "size": 2.16, "weight": 2.16, "supplyState": 57.6}, "tracked_raider": {"height": 2.2, "footprint": 4.0, "locomotionClass": "tracked", "speed": 1.2, "baseSignature": 32.5, "emission": false, "sensorStrength": 30, "sensorRange": 7, "sensorResolution": 34, "durability": 220, "armorFront": 12, "armorOther": 6, "supplyCapacity": 48, "weaponRange": 8, "damage": 30, "accuracy": 0.65, "suppressionPower": 18, "rateOfFire": 2.0, "size": 8.8, "weight": 8.8, "supplyState": 48}, "assault_walker": {"height": 5.0, "footprint": 9.0, "locomotionClass": "walker", "speed": 0.65, "baseSignature": 85.28, "emission": false, "sensorStrength": 36, "sensorRange": 8, "sensorResolution": 40, "durability": 500, "armorFront": 28, "armorOther": 14, "supplyCapacity": 56, "weaponRange": 10, "damage": 60, "accuracy": 0.8, "suppressionPower": 35, "rateOfFire": 0.4, "size": 45.0, "weight": 45.0, "supplyState": 56}, "recon_drone": {"height": 8.0, "footprint": 1.5, "locomotionClass": "air", "speed": 2.2, "baseSignature": 28.8, "emission": false, "sensorStrength": 66, "sensorRange": 12, "sensorResolution": 82, "durability": 100, "armorFront": 2, "armorOther": 2, "supplyCapacity": 18, "weaponRange": 0, "damage": 0, "accuracy": 0.0, "suppressionPower": 0, "rateOfFire": 0.0, "size": 12.0, "weight": 12.0, "supplyState": 18}, "tracked_supply_carrier": {"height": 2.2, "footprint": 4.0, "locomotionClass": "tracked", "speed": 1.08, "baseSignature": 55.0, "emission": false, "sensorStrength": 30, "sensorRange": 7, "sensorResolution": 34, "durability": 220, "armorFront": 12, "armorOther": 6, "supplyCapacity": 268, "weaponRange": 0, "damage": 0, "accuracy": 0.0, "suppressionPower": 0, "rateOfFire": 0.0, "size": 8.8, "weight": 8.8, "supplyState": 268}}}</script>
+
+<script>
+"use strict";
+
+const TERRAIN = JSON.parse(document.getElementById("terrainData").textContent);
+const UNITDATA = JSON.parse(document.getElementById("unitData").textContent);
+
+const TUNING = {
+  tilePx: 48,
+  mapCols: 24,
+  mapRows: 16,
+  elevationMovePenalty: 0.14,
+  trackedBlockDelta: 3,
+  infantryBlockDelta: 4,
+  walkerBlockDelta: 4,
+
+  emissionSignatureMultiplier: 1.70,
+  coverSignatureMaxReduction: 0.58,
+  sizeCoverScale: 7.0,
+
+  losCoverOcclusionScale: 0.92,
+  losOcclusionLimit: 1.35,
+  losElevationMargin: 0.15,
+
+  detectionThreshold: 0.22,
+  identificationThreshold: 0.42,
+  rangeFalloffPower: 1.35,
+  sensorStrengthWeight: 0.64,
+  signatureWeight: 0.36,
+
+  suppressionDecayPerSecond: 8.0,
+  suppressionAccuracyPenalty: 0.65,
+  suppressionMovePenalty: 0.45,
+  suppressionArmorScale: 55,
+  suppressionSizeScale: 24,
+  coverSuppressionReduction: 0.70,
+
+  frontArmorHalfAngleDeg: 65,
+  supplyTransferPerSecond: 10,
+  supplyTransferRange: 1.35,
+
+  aiThinkSeconds: 0.40,
+  defensiveChaseRange: 1.0,
+  aggressiveChaseRange: 4.0,
+  retreatHpFraction: 0.22
+};
+
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+const TILE = TUNING.tilePx;
+const W = TUNING.mapCols, H = TUNING.mapRows;
+canvas.width = W*TILE;
+canvas.height = H*TILE;
+
+const terrainColors = {
+  open:"#62675f", road:"#807866", vegetation:"#425d45", ruins:"#56565b",
+  soft_ground:"#5e5949", rough_ground:"#5b574f"
+};
+const terrainGlyph = {
+  open:"", road:"═", vegetation:"♣", ruins:"▦", soft_ground:"≈", rough_ground:"·"
+};
+
+const state = {
+  running:true, aiEnabled:true, showGrid:true, debug:false,
+  battlefieldVisibility:1.0, battlefieldMobility:1.0,
+  units:[], nextId:1, selected:new Set(),
+  memories:{blue:new Map(), red:new Map()},
+  map:[], simTime:0, lastAiThink:0,
+  mouse:{x:0,y:0,down:false,startX:0,startY:0,drag:false},
+  logLines:[]
+};
+
+function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function dist(a,b){ return Math.hypot(a.x-b.x,a.y-b.y); }
+function rad(deg){ return deg*Math.PI/180; }
+function angleDiff(a,b){
+  let d=a-b;
+  while(d>Math.PI)d-=Math.PI*2;
+  while(d<-Math.PI)d+=Math.PI*2;
+  return Math.abs(d);
+}
+function log(msg){
+  state.logLines.push(`[${state.simTime.toFixed(1)}] ${msg}`);
+  if(state.logLines.length>120) state.logLines.shift();
+  const el=document.getElementById("log");
+  el.innerHTML=state.logLines.slice(-30).map(x=>escapeHtml(x)).join("<br>");
+  el.scrollTop=el.scrollHeight;
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));}
+
+function tileAtXY(x,y){
+  const c=clamp(Math.floor(x),0,W-1), r=clamp(Math.floor(y),0,H-1);
+  return state.map[r][c];
+}
+function tileAtRC(r,c){ return (r>=0&&r<H&&c>=0&&c<W)?state.map[r][c]:null; }
+
+function makeMap(){
+  const m=[];
+  for(let r=0;r<H;r++){
+    const row=[];
+    for(let c=0;c<W;c++){
+      let preset="open", elevation=0;
+      // road spine + branch
+      if(r===7 || (c===12 && r>=3 && r<=12)) preset="road";
+      // vegetation clusters
+      if((c>=2&&c<=7&&r>=2&&r<=5) || (c>=15&&c<=21&&r>=10&&r<=14)) preset="vegetation";
+      // ruins in center-left / center-right
+      if((c>=7&&c<=10&&r>=9&&r<=12) || (c>=15&&c<=18&&r>=2&&r<=5)) preset="ruins";
+      // soft ground basin
+      if(c>=2&&c<=7&&r>=10&&r<=14) preset="soft_ground";
+      // rough ridge
+      if(c>=10&&c<=15&&r>=1&&r<=4) preset="rough_ground";
+
+      // road overlays some terrain
+      if(r===7 || (c===12 && r>=3 && r<=12)) preset="road";
+
+      // elevation ridge and gentle hills
+      if(r<=4 && c>=9&&c<=16) elevation=2;
+      else if(r<=6 && c>=8&&c<=17) elevation=1;
+      if(c>=18&&r>=9) elevation=Math.max(elevation,1);
+      if(c>=20&&r>=11) elevation=2;
+      if(c<=5&&r<=4) elevation=1;
+
+      row.push({r,c,preset,elevation});
+    }
+    m.push(row);
+  }
+  return m;
+}
+
+function resolvedUnit(key){
+  return JSON.parse(JSON.stringify(UNITDATA.resolved_test_units[key]));
+}
+
+function spawn(team,key,x,y,facing=0,stance="defensive"){
+  const s=resolvedUnit(key);
+  const u={
+    id:state.nextId++, team, key, name:key.replaceAll("_"," "),
+    x,y,facing, stance, formation:"compact",
+    spacing:1, frontage:4, ordering:"balanced",
+    hp:s.durability, hpMax:s.durability,
+    supply:s.supplyState, supplyMax:s.supplyCapacity,
+    suppression:0, emission:!!s.emission,
+    stats:s, path:[], moveGoal:null, manualTarget:null, autoTarget:null,
+    fireCooldown:Math.random()*0.4, lastKnownGoal:null, alive:true,
+    defensiveAnchor:{x,y}, selected:false
+  };
+  state.units.push(u);
+  return u;
+}
+
+function initialForces(){
+  state.units=[]; state.nextId=1; state.selected.clear();
+  state.memories.blue.clear(); state.memories.red.clear();
+
+  // Blue: mixed modular force.
+  spawn("blue","recon_infantry",3.0,4.0,0,"concealed");
+  spawn("blue","recon_infantry",3.2,5.0,0,"concealed");
+  spawn("blue","line_infantry",3.2,7.0,0,"defensive");
+  spawn("blue","line_infantry",4.0,7.6,0,"defensive");
+  spawn("blue","line_infantry",3.4,8.3,0,"defensive");
+  spawn("blue","suppression_infantry",4.8,7.0,0,"defensive");
+  spawn("blue","suppression_infantry",4.8,8.0,0,"defensive");
+  spawn("blue","tracked_raider",2.5,6.4,0,"aggressive");
+  spawn("blue","assault_walker",5.2,8.6,0,"defensive");
+  spawn("blue","recon_drone",5.0,3.0,0,"concealed");
+  spawn("blue","tracked_supply_carrier",2.4,8.8,0,"passive");
+
+  // Red test opponent.
+  spawn("red","recon_infantry",20.0,11.5,Math.PI,"concealed");
+  spawn("red","line_infantry",20.0,7.0,Math.PI,"defensive");
+  spawn("red","line_infantry",19.2,7.7,Math.PI,"defensive");
+  spawn("red","line_infantry",20.4,8.4,Math.PI,"defensive");
+  spawn("red","suppression_infantry",18.7,6.7,Math.PI,"defensive");
+  spawn("red","suppression_infantry",18.8,8.7,Math.PI,"defensive");
+  spawn("red","tracked_raider",21.0,9.4,Math.PI,"aggressive");
+  spawn("red","assault_walker",17.3,7.7,Math.PI,"defensive");
+  spawn("red","recon_drone",19.0,12.7,Math.PI,"concealed");
+  spawn("red","tracked_supply_carrier",21.2,6.2,Math.PI,"passive");
+  log("Scenariusz zresetowany.");
+}
+
+function effectiveCover(target){
+  const t=tileAtXY(target.x,target.y);
+  const raw=TERRAIN.terrain_presets[t.preset].cover;
+  const size=target.stats.size;
+  return clamp(raw / (1 + size/TUNING.sizeCoverScale), 0, 0.95);
+}
+
+function effectiveSignature(target){
+  let sig=target.stats.baseSignature;
+  if(target.emission){
+    const nightFactor=clamp(1.15-state.battlefieldVisibility,0.15,0.90);
+    sig*=1+(TUNING.emissionSignatureMultiplier-1)*nightFactor;
+  }
+  const cov=effectiveCover(target);
+  sig*=1 - cov*TUNING.coverSignatureMaxReduction;
+
+  // Geometry-derived formation effect: tight local clustering increases group signature.
+  let closeFriends=0;
+  for(const u of state.units){
+    if(!u.alive||u.id===target.id||u.team!==target.team)continue;
+    if(Math.hypot(u.x-target.x,u.y-target.y)<0.85)closeFriends++;
+  }
+  sig*=1+Math.min(0.30,closeFriends*0.08);
+  return Math.max(1,sig);
+}
+
+function passableFor(unit, fromTile, toTile){
+  if(unit.stats.locomotionClass==="air") return true;
+  const delta=Math.abs(toTile.elevation-fromTile.elevation);
+  const cls=unit.stats.locomotionClass;
+  let lim = cls==="tracked" ? TUNING.trackedBlockDelta :
+            cls==="infantry" ? TUNING.infantryBlockDelta : TUNING.walkerBlockDelta;
+  // Very large units lose one level of slope tolerance.
+  if(unit.stats.size>30) lim-=1;
+  return delta < lim;
+}
+function moveMultiplier(unit,tile,fromTile=null){
+  const p=TERRAIN.terrain_presets[tile.preset];
+  let m=p.mobility[unit.stats.locomotionClass] ?? 1;
+  m*=state.battlefieldMobility;
+  if(fromTile && unit.stats.locomotionClass!=="air"){
+    const dh=Math.abs(tile.elevation-fromTile.elevation);
+    m*=Math.max(0.25,1-dh*TUNING.elevationMovePenalty);
+  }
+  return m;
+}
+
+function tileCost(unit,r,c,nr,nc){
+  const a=tileAtRC(r,c), b=tileAtRC(nr,nc);
+  if(!b || !passableFor(unit,a,b)) return Infinity;
+  const diag=(r!==nr&&c!==nc)?Math.SQRT2:1;
+  const mul=Math.max(0.12,moveMultiplier(unit,b,a));
+  return diag/mul;
+}
+
+function findPath(unit,gx,gy){
+  if(unit.stats.locomotionClass==="air") return [{x:gx,y:gy}];
+  const sc=clamp(Math.floor(unit.x),0,W-1), sr=clamp(Math.floor(unit.y),0,H-1);
+  const gc=clamp(Math.floor(gx),0,W-1), gr=clamp(Math.floor(gy),0,H-1);
+  const key=(r,c)=>r*W+c;
+  const open=[{r:sr,c:sc,f:0}];
+  const g=new Map([[key(sr,sc),0]]);
+  const came=new Map();
+  const seen=new Set();
+  while(open.length){
+    open.sort((a,b)=>a.f-b.f);
+    const cur=open.shift(), ck=key(cur.r,cur.c);
+    if(seen.has(ck)) continue; seen.add(ck);
+    if(cur.r===gr&&cur.c===gc){
+      const out=[]; let r=gr,c=gc,k=key(r,c);
+      while(!(r===sr&&c===sc)){
+        out.push({x:c+0.5,y:r+0.5});
+        const prev=came.get(k); if(!prev) break;
+        r=prev.r;c=prev.c;k=key(r,c);
+      }
+      out.reverse();
+      out.push({x:gx,y:gy});
+      return out;
+    }
+    for(const [dr,dc] of [[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]]){
+      const nr=cur.r+dr,nc=cur.c+dc; if(nr<0||nr>=H||nc<0||nc>=W)continue;
+      const step=tileCost(unit,cur.r,cur.c,nr,nc); if(!isFinite(step))continue;
+      const ng=(g.get(ck)??Infinity)+step, nk=key(nr,nc);
+      if(ng<(g.get(nk)??Infinity)){
+        g.set(nk,ng);came.set(nk,{r:cur.r,c:cur.c});
+        const h=Math.hypot(gr-nr,gc-nc);
+        open.push({r:nr,c:nc,f:ng+h});
+      }
+    }
+  }
+  return [];
+}
+
+function sampleLine(a,b,step=0.18){
+  const d=dist(a,b), n=Math.max(1,Math.ceil(d/step)), pts=[];
+  for(let i=0;i<=n;i++){
+    const t=i/n; pts.push({x:lerp(a.x,b.x,t),y:lerp(a.y,b.y,t),t});
+  }
+  return pts;
+}
+
+function lineOfSight(observer,target){
+  const d=dist(observer,target);
+  if(d<0.01) return true;
+  const obsGround=tileAtXY(observer.x,observer.y).elevation;
+  const tarGround=tileAtXY(target.x,target.y).elevation;
+  const obsZ=obsGround+observer.stats.height;
+  const tarZ=tarGround+target.stats.height*0.55;
+  let occ=0;
+  const samples=sampleLine(observer,target,0.22);
+  let prevKey="";
+  for(let i=1;i<samples.length-1;i++){
+    const p=samples[i], tile=tileAtXY(p.x,p.y), k=tile.r+","+tile.c;
+    if(k===prevKey) continue; prevKey=k;
+    const rayZ=lerp(obsZ,tarZ,p.t);
+    const terrainZ=tile.elevation;
+    if(terrainZ > rayZ-TUNING.losElevationMargin) return false;
+    const c=TERRAIN.terrain_presets[tile.preset].cover;
+    const heightFactor=clamp(1-(rayZ-terrainZ)/Math.max(1,observer.stats.height+target.stats.height),0.15,1);
+    occ += c*TUNING.losCoverOcclusionScale*heightFactor;
+    if(occ>TUNING.losOcclusionLimit) return false;
+  }
+
+  // Mutual blocking by units: formation ordering and spacing can therefore change LoS.
+  const ax=observer.x, ay=observer.y, bx=target.x, by=target.y;
+  const abx=bx-ax, aby=by-ay, ab2=abx*abx+aby*aby;
+  for(const blocker of state.units){
+    if(!blocker.alive||blocker.id===observer.id||blocker.id===target.id||blocker.stats.locomotionClass==="air")continue;
+    const apx=blocker.x-ax, apy=blocker.y-ay;
+    const t=clamp((apx*abx+apy*aby)/Math.max(0.0001,ab2),0,1);
+    if(t<=0.05||t>=0.95)continue;
+    const cx=ax+abx*t, cy=ay+aby*t;
+    const lateral=Math.hypot(blocker.x-cx,blocker.y-cy);
+    const blockRadius=0.10+Math.sqrt(blocker.stats.footprint)*0.09;
+    if(lateral>blockRadius)continue;
+    const rayZ=lerp(obsZ,tarZ,t);
+    const blockerZ=tileAtXY(blocker.x,blocker.y).elevation+blocker.stats.height;
+    if(blockerZ>=rayZ*0.88)return false;
+  }
+  return true;
+}
+
+function observationQuality(observer,target){
+  const d=dist(observer,target), s=observer.stats;
+  if(d>s.sensorRange || !lineOfSight(observer,target)) return 0;
+  const rangeFactor=Math.pow(clamp(1-d/Math.max(0.001,s.sensorRange),0,1),TUNING.rangeFalloffPower);
+  const strength=clamp(s.sensorStrength/100,0,1);
+  const signature=clamp(effectiveSignature(target)/100,0,1);
+  const raw=(strength*TUNING.sensorStrengthWeight + signature*TUNING.signatureWeight);
+  const q=raw * (0.28+0.72*rangeFactor) * state.battlefieldVisibility;
+  return clamp(q,0,1);
+}
+function bestObservation(team,target){
+  let best=0, obs=null;
+  for(const u of state.units){
+    if(!u.alive||u.team!==team)continue;
+    const q=observationQuality(u,target);
+    if(q>best){best=q;obs=u;}
+  }
+  return {q:best,observer:obs};
+}
+function updateMemories(){
+  for(const team of ["blue","red"]){
+    const mem=state.memories[team];
+    for(const target of state.units){
+      if(!target.alive||target.team===team)continue;
+      const {q}=bestObservation(team,target);
+      if(q>=TUNING.detectionThreshold){
+        const resolution=bestResolution(team,target);
+        mem.set(target.id,{x:target.x,y:target.y,time:state.simTime,q,resolution,alive:true});
+      } else {
+        const old=mem.get(target.id);
+        if(old) old.q=Math.max(0,old.q-0.02);
+      }
+    }
+  }
+}
+function bestResolution(team,target){
+  let best=0;
+  for(const u of state.units){
+    if(!u.alive||u.team!==team)continue;
+    const q=observationQuality(u,target);
+    best=Math.max(best,q*(u.stats.sensorResolution/100));
+  }
+  return clamp(best,0,1);
+}
+function isDetected(team,target){
+  return bestObservation(team,target).q>=TUNING.detectionThreshold;
+}
+
+function armorAgainst(target,attacker){
+  const incoming=Math.atan2(attacker.y-target.y,attacker.x-target.x);
+  const d=angleDiff(incoming,target.facing);
+  return d<=rad(TUNING.frontArmorHalfAngleDeg)?target.stats.armorFront:target.stats.armorOther;
+}
+
+function fireAt(shooter,target){
+  if(!shooter.alive||!target.alive||shooter.supply<1||shooter.stats.rateOfFire<=0)return false;
+  const d=dist(shooter,target);
+  if(d>shooter.stats.weaponRange || !lineOfSight(shooter,target))return false;
+  const q=observationQuality(shooter,target);
+  if(q<TUNING.detectionThreshold)return false;
+
+  shooter.supply=Math.max(0,shooter.supply-1);
+  shooter.fireCooldown=1/Math.max(0.01,shooter.stats.rateOfFire);
+
+  const supPenalty=1-(shooter.suppression/100)*TUNING.suppressionAccuracyPenalty;
+  const effectiveAcc=clamp(shooter.stats.accuracy*(0.35+0.65*q)*supPenalty,0.02,0.98);
+  const hit=Math.random()<effectiveAcc;
+
+  const cov=effectiveCover(target);
+  const armor=armorAgainst(target,shooter);
+  const supRes=(1-cov*TUNING.coverSuppressionReduction) *
+               (1-clamp(armor/TUNING.suppressionArmorScale,0,0.55)) /
+               (1+target.stats.size/TUNING.suppressionSizeScale);
+
+  if(hit){
+    const dmg=Math.max(0,shooter.stats.damage-armor);
+    target.hp=Math.max(0,target.hp-dmg);
+    target.suppression=clamp(target.suppression+shooter.stats.suppressionPower*supRes,0,100);
+    if(dmg>0 && (Math.random()<0.18 || target.hp===0))
+      log(`${shooter.team} ${shooter.name} trafia ${target.name}: ${dmg.toFixed(0)} dmg (${armor===target.stats.armorFront?"front":"other"} armor).`);
+    if(target.hp<=0) killUnit(target,shooter);
+  }else{
+    target.suppression=clamp(target.suppression+shooter.stats.suppressionPower*0.28*supRes,0,100);
+  }
+  return true;
+}
+
+function killUnit(u,killer){
+  if(!u.alive)return;
+  u.alive=false; state.selected.delete(u.id);
+  log(`${u.team} ${u.name} zniszczony przez ${killer?.name||"?"}.`);
+  state.memories.blue.delete(u.id); state.memories.red.delete(u.id);
+}
+
+function selectTargetFor(u){
+  if(u.stance==="passive"||u.stance==="concealed") return null;
+  let best=null,bestScore=-Infinity;
+  for(const e of state.units){
+    if(!e.alive||e.team===u.team)continue;
+    const q=observationQuality(u,e);
+    if(q<TUNING.detectionThreshold)continue;
+    const d=dist(u,e);
+    const chase=u.stance==="aggressive"?TUNING.aggressiveChaseRange:TUNING.defensiveChaseRange;
+    if(d>u.stats.weaponRange+chase)continue;
+    const score=(1-d/(u.stats.weaponRange+chase+0.001))*2 + (1-e.hp/e.hpMax);
+    if(score>bestScore){bestScore=score;best=e;}
+  }
+  return best;
+}
+
+function updateCombat(u,dt){
+  if(!u.alive)return;
+  u.fireCooldown=Math.max(0,u.fireCooldown-dt);
+  u.suppression=Math.max(0,u.suppression-TUNING.suppressionDecayPerSecond*dt);
+
+  if(u.hp/u.hpMax<TUNING.retreatHpFraction && u.stance!=="passive"){
+    // No forced retreat: stance remains a player/AI order. AI may issue it separately.
+  }
+
+  let target=null;
+  if(u.manualTarget){
+    target=state.units.find(x=>x.id===u.manualTarget&&x.alive);
+    if(!target)u.manualTarget=null;
+  }
+  if(!target){
+    u.autoTarget=selectTargetFor(u)?.id||null;
+    target=state.units.find(x=>x.id===u.autoTarget&&x.alive);
+  }
+  if(!target)return;
+
+  const d=dist(u,target);
+  if(d<=u.stats.weaponRange && u.fireCooldown<=0){
+    fireAt(u,target);
+  } else if(u.stance==="aggressive" && d<=u.stats.weaponRange+TUNING.aggressiveChaseRange && !u.moveGoal){
+    issueMoveSingle(u,target.x,target.y);
+  }
+}
+
+function transferSupply(dt){
+  const carriers=state.units.filter(u=>u.alive&&u.key==="tracked_supply_carrier"&&u.supply>0);
+  for(const c of carriers){
+    for(const u of state.units){
+      if(!u.alive||u.team!==c.team||u.id===c.id||u.supply>=u.supplyMax-0.01)continue;
+      if(dist(c,u)<=TUNING.supplyTransferRange){
+        const amount=Math.min(TUNING.supplyTransferPerSecond*dt,c.supply,u.supplyMax-u.supply);
+        c.supply-=amount;u.supply+=amount;
+      }
+    }
+  }
+}
+
+function issueMoveSingle(u,x,y){
+  u.moveGoal={x,y};
+  u.path=findPath(u,x,y);
+  u.manualTarget=null;
+}
+function updateMovement(u,dt){
+  if(!u.alive||!u.path.length)return;
+  const p=u.path[0];
+  const dx=p.x-u.x,dy=p.y-u.y,d=Math.hypot(dx,dy);
+  if(d<0.05){u.path.shift();if(!u.path.length)u.moveGoal=null;return;}
+  const tile=tileAtXY(u.x,u.y), nextTile=tileAtXY(p.x,p.y);
+  const mul=moveMultiplier(u,nextTile,tile);
+  const supMove=1-(u.suppression/100)*TUNING.suppressionMovePenalty;
+  const speed=u.stats.speed*mul*supMove;
+  const step=Math.min(d,speed*dt);
+  const nx=dx/d,ny=dy/d;
+  u.x+=nx*step;u.y+=ny*step;
+  u.facing=Math.atan2(ny,nx);
+}
+
+function formationSettings(name){
+  if(name==="compact")return {spacing:0.65,frontage:3};
+  if(name==="line")return {spacing:1.0,frontage:99};
+  return {spacing:1.5,frontage:4};
+}
+function sortedForOrdering(units,ordering){
+  const a=[...units];
+  if(ordering==="armor_front") a.sort((x,y)=>(y.stats.armorFront+y.stats.size*0.2)-(x.stats.armorFront+x.stats.size*0.2));
+  else if(ordering==="scouts_front") a.sort((x,y)=>(y.stats.sensorStrength-y.stats.baseSignature*0.2)-(x.stats.sensorStrength-x.stats.baseSignature*0.2));
+  else if(ordering==="support_rear") a.sort((x,y)=>(x.stats.weaponRange+x.stats.suppressionPower*0.05)-(y.stats.weaponRange+y.stats.suppressionPower*0.05));
+  else a.sort((x,y)=>x.id-y.id);
+  return a;
+}
+function issueFormationMove(units,gx,gy){
+  if(!units.length)return;
+  const form=document.getElementById("formation").value;
+  const spacing=parseFloat(document.getElementById("spacing").value)||1;
+  let frontage=parseInt(document.getElementById("frontage").value)||4;
+  if(form==="line") frontage=units.length;
+  if(form==="compact") frontage=Math.min(frontage,Math.ceil(Math.sqrt(units.length)));
+  const ordering=document.getElementById("ordering").value;
+  const arr=sortedForOrdering(units,ordering);
+
+  const avg={x:arr.reduce((s,u)=>s+u.x,0)/arr.length,y:arr.reduce((s,u)=>s+u.y,0)/arr.length};
+  const dir=Math.atan2(gy-avg.y,gx-avg.x);
+  const right={x:-Math.sin(dir),y:Math.cos(dir)};
+  const back={x:-Math.cos(dir),y:-Math.sin(dir)};
+  const maxFoot=Math.sqrt(Math.max(...arr.map(u=>u.stats.footprint)));
+  const cell=Math.max(0.4,spacing+maxFoot*0.22);
+
+  arr.forEach((u,i)=>{
+    const col=i%frontage,row=Math.floor(i/frontage);
+    const rowCount=Math.min(frontage,arr.length-row*frontage);
+    const centered=col-(rowCount-1)/2;
+    const x=gx+right.x*centered*cell+back.x*row*cell;
+    const y=gy+right.y*centered*cell+back.y*row*cell;
+    u.formation=form;u.spacing=spacing;u.frontage=frontage;u.ordering=ordering;
+    issueMoveSingle(u,clamp(x,0.2,W-0.2),clamp(y,0.2,H-0.2));
+  });
+}
+
+function retreatSelected(){
+  const arr=selectedUnits(); if(!arr.length)return;
+  // Retreat 4 tiles opposite nearest known enemy centroid.
+  let ex=0,ey=0,n=0;
+  for(const e of state.units) if(e.alive&&e.team==="red"){ex+=e.x;ey+=e.y;n++;}
+  if(!n)return;ex/=n;ey/=n;
+  const ax=arr.reduce((s,u)=>s+u.x,0)/arr.length, ay=arr.reduce((s,u)=>s+u.y,0)/arr.length;
+  const dx=ax-ex,dy=ay-ey,d=Math.hypot(dx,dy)||1;
+  issueFormationMove(arr,clamp(ax+dx/d*4,0.5,W-0.5),clamp(ay+dy/d*4,0.5,H-0.5));
+  arr.forEach(u=>u.stance="passive");
+  syncSelectionControls();
+}
+
+function updateAI(dt){
+  if(!state.aiEnabled || state.simTime-state.lastAiThink<TUNING.aiThinkSeconds)return;
+  state.lastAiThink=state.simTime;
+  for(const u of state.units){
+    if(!u.alive||u.team!=="red")continue;
+    if(u.hp/u.hpMax<TUNING.retreatHpFraction){
+      u.stance="passive";
+      const dx=u.x-12,dy=u.y-8,d=Math.hypot(dx,dy)||1;
+      if(!u.path.length) issueMoveSingle(u,clamp(u.x+dx/d*3,0.5,W-0.5),clamp(u.y+dy/d*3,0.5,H-0.5));
+      continue;
+    }
+    const t=selectTargetFor(u);
+    if(t){
+      u.autoTarget=t.id;
+      if(u.stance==="aggressive" && dist(u,t)>u.stats.weaponRange*0.85 && !u.path.length){
+        issueMoveSingle(u,t.x,t.y);
+      }
+    }else if(u.stance==="aggressive" && !u.path.length){
+      const mem=nearestMemory("red",u);
+      if(mem) issueMoveSingle(u,mem.x,mem.y);
+      else if(Math.random()<0.08) issueMoveSingle(u,12+Math.random()*3-1.5,7+Math.random()*3-1.5);
+    }
+  }
+}
+
+function nearestMemory(team,u){
+  let best=null,bd=Infinity;
+  for(const m of state.memories[team].values()){
+    if(state.simTime-m.time>12)continue;
+    const d=Math.hypot(m.x-u.x,m.y-u.y);
+    if(d<bd){bd=d;best=m;}
+  }
+  return best;
+}
+
+function update(dt){
+  state.simTime+=dt;
+  updateMemories();
+  updateAI(dt);
+  for(const u of state.units){updateMovement(u,dt);updateCombat(u,dt);}
+  transferSupply(dt);
+}
+
+function teamColor(team){return team==="blue"?"#72b8ff":"#ff7b79";}
+function unitRadius(u){return clamp(0.16+Math.sqrt(u.stats.footprint)*0.08,0.18,0.42);}
+
+function drawMap(){
+  for(let r=0;r<H;r++)for(let c=0;c<W;c++){
+    const t=state.map[r][c], x=c*TILE,y=r*TILE;
+    ctx.fillStyle=terrainColors[t.preset];ctx.fillRect(x,y,TILE,TILE);
+    // elevation tint
+    if(t.elevation>0){ctx.fillStyle=`rgba(255,255,255,${0.055*t.elevation})`;ctx.fillRect(x,y,TILE,TILE);}
+    const g=terrainGlyph[t.preset];
+    if(g){ctx.fillStyle="rgba(230,240,230,.18)";ctx.font="16px system-ui";ctx.fillText(g,x+5,y+17);}
+    if(t.elevation){ctx.fillStyle="rgba(255,255,255,.55)";ctx.font="10px ui-monospace";ctx.fillText("h"+t.elevation,x+TILE-18,y+11);}
+  }
+  if(state.showGrid){
+    ctx.strokeStyle="rgba(15,20,25,.45)";ctx.lineWidth=1;ctx.beginPath();
+    for(let c=0;c<=W;c++){ctx.moveTo(c*TILE,0);ctx.lineTo(c*TILE,H*TILE);}
+    for(let r=0;r<=H;r++){ctx.moveTo(0,r*TILE);ctx.lineTo(W*TILE,r*TILE);}
+    ctx.stroke();
+  }
+}
+
+function drawUnit(u,viewer="blue"){
+  if(!u.alive)return;
+  const own=u.team===viewer;
+  let visible=own, contact=false, identified=own;
+  if(!own){
+    const obs=bestObservation(viewer,u); visible=obs.q>=TUNING.detectionThreshold;
+    if(visible){
+      contact=true;
+      identified=bestResolution(viewer,u)>=TUNING.identificationThreshold;
+    }
+  }
+  if(!visible)return;
+
+  const px=u.x*TILE,py=u.y*TILE,r=unitRadius(u)*TILE;
+  if(contact&&!identified){
+    ctx.fillStyle="rgba(255,190,110,.9)";ctx.beginPath();ctx.arc(px,py,5,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle="rgba(255,210,140,.7)";ctx.beginPath();ctx.arc(px,py,9,0,Math.PI*2);ctx.stroke();
+    return;
+  }
+
+  ctx.save();ctx.translate(px,py);ctx.rotate(u.facing);
+  ctx.fillStyle=teamColor(u.team);ctx.strokeStyle="#111";ctx.lineWidth=2;
+  if(u.stats.locomotionClass==="infantry"){
+    ctx.beginPath();ctx.arc(0,0,r,0,Math.PI*2);ctx.fill();ctx.stroke();
+  } else if(u.stats.locomotionClass==="tracked"){
+    ctx.fillRect(-r,-r*.68,r*2,r*1.36);ctx.strokeRect(-r,-r*.68,r*2,r*1.36);
+  } else if(u.stats.locomotionClass==="walker"){
+    ctx.beginPath();ctx.moveTo(r,0);ctx.lineTo(-r*.7,-r*.8);ctx.lineTo(-r*.7,r*.8);ctx.closePath();ctx.fill();ctx.stroke();
+  } else {
+    ctx.beginPath();ctx.moveTo(r,0);ctx.lineTo(-r*.75,-r*.55);ctx.lineTo(-r*.35,0);ctx.lineTo(-r*.75,r*.55);ctx.closePath();ctx.fill();ctx.stroke();
+  }
+  ctx.strokeStyle="#111";ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(r*1.25,0);ctx.stroke();
+  ctx.restore();
+
+  if(state.selected.has(u.id)){
+    ctx.strokeStyle="#fff";ctx.lineWidth=2;ctx.beginPath();ctx.arc(px,py,r+5,0,Math.PI*2);ctx.stroke();
+  }
+  if(u.emission){
+    ctx.strokeStyle="rgba(255,240,140,.65)";ctx.beginPath();ctx.arc(px,py,r+9,0,Math.PI*2);ctx.stroke();
+  }
+
+  // bars
+  const bw=Math.max(22,r*2),bx=px-bw/2,by=py-r-10;
+  ctx.fillStyle="#0a0c0e";ctx.fillRect(bx,by,bw,4);
+  ctx.fillStyle="#8bd392";ctx.fillRect(bx,by,bw*(u.hp/u.hpMax),4);
+  if(u.suppression>2){
+    ctx.fillStyle="#0a0c0e";ctx.fillRect(bx,by+5,bw,3);
+    ctx.fillStyle="#e5c05f";ctx.fillRect(bx,by+5,bw*(u.suppression/100),3);
+  }
+  if(state.debug){
+    ctx.fillStyle="#fff";ctx.font="9px ui-monospace";ctx.fillText(`#${u.id} ${u.key}`,px-r,py+r+13);
+  }
+}
+
+function drawMemories(){
+  const mem=state.memories.blue;
+  for(const [id,m] of mem){
+    const target=state.units.find(u=>u.id===id);
+    if(target?.alive && isDetected("blue",target))continue;
+    if(state.simTime-m.time>18)continue;
+    const a=clamp(1-(state.simTime-m.time)/18,0,1);
+    ctx.strokeStyle=`rgba(255,165,90,${a*.7})`;ctx.lineWidth=1.5;
+    const x=m.x*TILE,y=m.y*TILE;
+    ctx.beginPath();ctx.moveTo(x-6,y-6);ctx.lineTo(x+6,y+6);ctx.moveTo(x+6,y-6);ctx.lineTo(x-6,y+6);ctx.stroke();
+  }
+}
+
+function drawDebug(){
+  if(!state.debug)return;
+  const arr=selectedUnits(); if(!arr.length)return;
+  for(const u of arr){
+    const x=u.x*TILE,y=u.y*TILE;
+    ctx.strokeStyle="rgba(100,190,255,.35)";ctx.lineWidth=1;
+    ctx.beginPath();ctx.arc(x,y,u.stats.sensorRange*TILE,0,Math.PI*2);ctx.stroke();
+    if(u.stats.weaponRange>0){
+      ctx.strokeStyle="rgba(255,160,120,.35)";ctx.beginPath();ctx.arc(x,y,u.stats.weaponRange*TILE,0,Math.PI*2);ctx.stroke();
+    }
+  }
+}
+
+function drawSelectionBox(){
+  if(!state.mouse.down||!state.mouse.drag)return;
+  const x=Math.min(state.mouse.startX,state.mouse.x),y=Math.min(state.mouse.startY,state.mouse.y);
+  const w=Math.abs(state.mouse.x-state.mouse.startX),h=Math.abs(state.mouse.y-state.mouse.startY);
+  ctx.fillStyle="rgba(100,180,255,.12)";ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle="rgba(140,205,255,.8)";ctx.strokeRect(x,y,w,h);
+}
+
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  drawMap();drawMemories();
+  for(const u of state.units)drawUnit(u,"blue");
+  drawDebug();drawSelectionBox();
+}
+
+function selectedUnits(){return state.units.filter(u=>u.alive&&state.selected.has(u.id)&&u.team==="blue");}
+function unitAtCanvas(px,py,teamFilter=null){
+  let best=null,bd=999;
+  for(const u of state.units){
+    if(!u.alive || (teamFilter&&u.team!==teamFilter))continue;
+    if(u.team==="red"&&!isDetected("blue",u))continue;
+    const d=Math.hypot(px-u.x*TILE,py-u.y*TILE),rr=unitRadius(u)*TILE+8;
+    if(d<rr&&d<bd){bd=d;best=u;}
+  }
+  return best;
+}
+function canvasPos(ev){
+  const rect=canvas.getBoundingClientRect();
+  const sx=canvas.width/rect.width,sy=canvas.height/rect.height;
+  return {x:(ev.clientX-rect.left)*sx,y:(ev.clientY-rect.top)*sy};
+}
+
+canvas.addEventListener("mousedown",ev=>{
+  if(ev.button!==0)return;
+  const p=canvasPos(ev);state.mouse.down=true;state.mouse.drag=false;
+  state.mouse.startX=p.x;state.mouse.startY=p.y;state.mouse.x=p.x;state.mouse.y=p.y;
+});
+canvas.addEventListener("mousemove",ev=>{
+  const p=canvasPos(ev);state.mouse.x=p.x;state.mouse.y=p.y;
+  if(state.mouse.down && Math.hypot(p.x-state.mouse.startX,p.y-state.mouse.startY)>8)state.mouse.drag=true;
+  updateHover(p.x,p.y);
+});
+canvas.addEventListener("mouseup",ev=>{
+  if(ev.button!==0)return;
+  const p=canvasPos(ev);
+  if(state.mouse.drag){
+    if(!ev.shiftKey)state.selected.clear();
+    const x1=Math.min(state.mouse.startX,p.x),x2=Math.max(state.mouse.startX,p.x);
+    const y1=Math.min(state.mouse.startY,p.y),y2=Math.max(state.mouse.startY,p.y);
+    for(const u of state.units)if(u.alive&&u.team==="blue"){
+      const x=u.x*TILE,y=u.y*TILE;if(x>=x1&&x<=x2&&y>=y1&&y<=y2)state.selected.add(u.id);
+    }
+  }else{
+    const u=unitAtCanvas(p.x,p.y,"blue");
+    if(!ev.shiftKey)state.selected.clear();
+    if(u){
+      if(ev.shiftKey&&state.selected.has(u.id))state.selected.delete(u.id);else state.selected.add(u.id);
+    }
+  }
+  state.mouse.down=false;state.mouse.drag=false;syncSelectionControls();updateSide();
+});
+canvas.addEventListener("contextmenu",ev=>{
+  ev.preventDefault();
+  const p=canvasPos(ev),enemy=unitAtCanvas(p.x,p.y,"red"),arr=selectedUnits();
+  if(!arr.length)return;
+  if(enemy){
+    arr.forEach(u=>{u.manualTarget=enemy.id;u.autoTarget=null;u.path=[];u.moveGoal=null;});
+    log(`Rozkaz ataku na ${enemy.name} (#${enemy.id}).`);
+  }else{
+    issueFormationMove(arr,p.x/TILE,p.y/TILE);
+  }
+});
+
+function applyStance(v){
+  for(const u of selectedUnits()){
+    u.stance=v;
+    if(v==="concealed"){u.emission=false;u.manualTarget=null;}
+  }
+}
+function syncSelectionControls(){
+  const a=selectedUnits();if(!a.length)return;
+  const u=a[0];
+  document.getElementById("stance").value=u.stance;
+  document.getElementById("formation").value=u.formation||"compact";
+  document.getElementById("spacing").value=u.spacing||1;
+  document.getElementById("frontage").value=u.frontage||4;
+  document.getElementById("ordering").value=u.ordering||"balanced";
+}
+
+document.getElementById("stance").addEventListener("change",e=>applyStance(e.target.value));
+document.getElementById("formation").addEventListener("change",e=>{
+  const s=formationSettings(e.target.value);
+  document.getElementById("spacing").value=s.spacing;
+  if(s.frontage!==99)document.getElementById("frontage").value=s.frontage;
+  for(const u of selectedUnits())u.formation=e.target.value;
+});
+for(const id of ["spacing","frontage","ordering"])document.getElementById(id).addEventListener("change",()=>{
+  for(const u of selectedUnits()){
+    u.spacing=parseFloat(document.getElementById("spacing").value);
+    u.frontage=parseInt(document.getElementById("frontage").value);
+    u.ordering=document.getElementById("ordering").value;
+  }
+});
+document.getElementById("emissionBtn").onclick=()=>{for(const u of selectedUnits())u.emission=!u.emission;};
+document.getElementById("stopBtn").onclick=()=>{for(const u of selectedUnits()){u.path=[];u.moveGoal=null;u.manualTarget=null;}};
+document.getElementById("retreatBtn").onclick=retreatSelected;
+
+document.getElementById("pauseBtn").onclick=()=>{
+  state.running=!state.running;
+  document.getElementById("pauseBtn").textContent=state.running?"⏸ Pauza":"▶ Start";
+};
+document.getElementById("resetBtn").onclick=()=>{state.simTime=0;state.logLines=[];state.map=makeMap();initialForces();updateSide();};
+document.getElementById("aiBtn").onclick=()=>{
+  state.aiEnabled=!state.aiEnabled;const b=document.getElementById("aiBtn");
+  b.textContent=`AI: ${state.aiEnabled?"ON":"OFF"}`;b.classList.toggle("active",state.aiEnabled);
+};
+document.getElementById("gridBtn").onclick=()=>{
+  state.showGrid=!state.showGrid;document.getElementById("gridBtn").classList.toggle("active",state.showGrid);
+};
+document.getElementById("debugBtn").onclick=()=>{
+  state.debug=!state.debug;document.getElementById("debugBtn").classList.toggle("active",state.debug);
+};
+document.getElementById("visibility").oninput=e=>{
+  state.battlefieldVisibility=parseFloat(e.target.value);document.getElementById("visibilityVal").textContent=state.battlefieldVisibility.toFixed(2);
+};
+document.getElementById("mobility").oninput=e=>{
+  state.battlefieldMobility=parseFloat(e.target.value);document.getElementById("mobilityVal").textContent=state.battlefieldMobility.toFixed(2);
+};
+function setVis(v,night){
+  state.battlefieldVisibility=v;document.getElementById("visibility").value=v;document.getElementById("visibilityVal").textContent=v.toFixed(2);
+  document.getElementById("dayBtn").classList.toggle("active",!night);document.getElementById("nightBtn").classList.toggle("active",night);
+}
+document.getElementById("dayBtn").onclick=()=>setVis(1,false);
+document.getElementById("nightBtn").onclick=()=>setVis(.45,true);
+
+window.addEventListener("keydown",ev=>{
+  if(["INPUT","SELECT"].includes(document.activeElement.tagName))return;
+  const k=ev.key.toLowerCase();
+  if(k==="a"){applyStance("aggressive");document.getElementById("stance").value="aggressive";}
+  if(k==="d"){applyStance("defensive");document.getElementById("stance").value="defensive";}
+  if(k==="p"){applyStance("passive");document.getElementById("stance").value="passive";}
+  if(k==="c"){applyStance("concealed");document.getElementById("stance").value="concealed";}
+  if(k==="e"){for(const u of selectedUnits())u.emission=!u.emission;}
+  if(k==="f"){
+    const el=document.getElementById("formation"), vals=["compact","line","spread"];
+    el.value=vals[(vals.indexOf(el.value)+1)%vals.length];el.dispatchEvent(new Event("change"));
+  }
+  if(k===" "){ev.preventDefault();document.getElementById("pauseBtn").click();}
+});
+
+function updateHover(px,py){
+  const c=clamp(Math.floor(px/TILE),0,W-1),r=clamp(Math.floor(py/TILE),0,H-1),t=state.map[r][c],p=TERRAIN.terrain_presets[t.preset];
+  document.getElementById("hover").textContent=`[${c},${r}] ${t.preset} • h=${t.elevation} • cover=${p.cover.toFixed(2)}`;
+  document.getElementById("tileInfo").innerHTML=[
+    ["pole",`${c}, ${r}`],["preset",t.preset],["surface",p.surface],["elevation",t.elevation],["cover",p.cover.toFixed(2)],
+    ["infantry move",p.mobility.infantry.toFixed(2)],["tracked move",p.mobility.tracked.toFixed(2)],
+    ["walker move",p.mobility.walker.toFixed(2)],["air move",p.mobility.air.toFixed(2)]
+  ].map(([a,b])=>`<span>${a}</span><b>${b}</b>`).join("");
+}
+
+function updateSide(){
+  const el=document.getElementById("selectionInfo"),a=selectedUnits();
+  if(!a.length){el.innerHTML="Brak zaznaczenia.";return;}
+  if(a.length>1){
+    const hp=a.reduce((s,u)=>s+u.hp,0),max=a.reduce((s,u)=>s+u.hpMax,0);
+    const supply=a.reduce((s,u)=>s+u.supply,0),smax=a.reduce((s,u)=>s+u.supplyMax,0);
+    el.innerHTML=`<b>${a.length} jednostek</b>
+      <div class="small">${[...new Set(a.map(u=>u.key))].map(x=>`<span class=pill>${x}</span>`).join("")}</div>
+      <div class="row"><span>HP</span><span class=value>${hp.toFixed(0)} / ${max.toFixed(0)}</span></div>
+      <div class="bar hp"><i style="width:${100*hp/max}%"></i></div>
+      <div class="row"><span>Supply</span><span class=value>${supply.toFixed(1)} / ${smax.toFixed(1)}</span></div>
+      <div class="bar ammo"><i style="width:${100*supply/smax}%"></i></div>`;
+    return;
+  }
+  const u=a[0],s=u.stats,t=tileAtXY(u.x,u.y);
+  el.innerHTML=`
+    <b>${u.name}</b> <span class=pill>#${u.id}</span>
+    <div class=small>${u.team} • ${s.locomotionClass} • stance=${u.stance}</div>
+    <div class=row><span>HP</span><span class=value>${u.hp.toFixed(0)} / ${u.hpMax.toFixed(0)}</span></div>
+    <div class="bar hp"><i style="width:${100*u.hp/u.hpMax}%"></i></div>
+    <div class=row><span>Suppression</span><span class=value>${u.suppression.toFixed(1)}</span></div>
+    <div class="bar sup"><i style="width:${u.suppression}%"></i></div>
+    <div class=row><span>Supply</span><span class=value>${u.supply.toFixed(1)} / ${u.supplyMax.toFixed(1)}</span></div>
+    <div class="bar ammo"><i style="width:${100*u.supply/u.supplyMax}%"></i></div>
+    <div class=sep></div>
+    <div class=statgrid>
+      <span>height</span><b>${s.height}</b><span>footprint / size</span><b>${s.footprint} / ${s.size}</b>
+      <span>speed</span><b>${s.speed}</b><span>signature eff.</span><b>${effectiveSignature(u).toFixed(1)}</b>
+      <span>sensor S/R/Res</span><b>${s.sensorStrength}/${s.sensorRange}/${s.sensorResolution}</b>
+      <span>armor front/other</span><b>${s.armorFront}/${s.armorOther}</b>
+      <span>weapon range</span><b>${s.weaponRange}</b><span>damage / accuracy</span><b>${s.damage} / ${s.accuracy}</b>
+      <span>suppression / RoF</span><b>${s.suppressionPower} / ${s.rateOfFire}</b>
+      <span>tile</span><b>${t.preset} h${t.elevation}</b><span>effective cover</span><b>${effectiveCover(u).toFixed(2)}</b>
+      <span>emission</span><b>${u.emission?"ON":"OFF"}</b>
+    </div>`;
+}
+function fillTuning(){
+  const keep=["detectionThreshold","identificationThreshold","emissionSignatureMultiplier","losOcclusionLimit",
+    "suppressionDecayPerSecond","suppressionAccuracyPenalty","suppressionMovePenalty","frontArmorHalfAngleDeg","supplyTransferPerSecond"];
+  document.getElementById("tuningInfo").innerHTML=keep.map(k=>`<span>${k}</span><b>${TUNING[k]}</b>`).join("");
+}
+
+let last=performance.now();
+function frame(now){
+  let dt=Math.min(.05,(now-last)/1000);last=now;
+  if(state.running)update(dt);
+  render();
+  if(Math.floor(now/150)!==Math.floor((now-dt*1000)/150))updateSide();
+  requestAnimationFrame(frame);
+}
+
+state.map=makeMap();
+initialForces();
+fillTuning();
+updateHover(1,1);
+updateSide();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

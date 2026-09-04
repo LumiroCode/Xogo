@@ -1,0 +1,416 @@
+{
+  "schema_version": "0.1-mvp",
+  "units": {
+    "height": "abstract height units",
+    "footprint": "abstract ground-area units",
+    "size": "derived = footprint * height",
+    "speed": "tiles per second before terrain modifiers",
+    "baseSignature": "0..100, higher = easier to detect",
+    "sensorStrength": "0..100",
+    "sensorRange": "tiles",
+    "sensorResolution": "0..100",
+    "durability": "HP",
+    "armorFront": "flat damage reduction",
+    "armorOther": "flat damage reduction",
+    "weaponRange": "tiles",
+    "damage": "damage per hit before armor",
+    "accuracy": "0..1",
+    "suppressionPower": "suppression per hit/event, relative scale",
+    "rateOfFire": "shots per second",
+    "supplyCapacity": "generic supply units carried",
+    "supplyState": "current generic supply units carried"
+  },
+  "rules": {
+    "size_formula": "footprint * height",
+    "weight_model_mvp": "weight == size",
+    "damage_formula": "max(0, damage - relevant_armor)",
+    "supply_per_shot": 1,
+    "emission": "runtime ON/OFF flag; defaults to false",
+    "penetration": "not in MVP",
+    "coverUsage": "not a unit stat; effective cover depends on terrain cover and unit size",
+    "fuel": "not in MVP",
+    "cohesion": "not in MVP",
+    "assembly": "platform + weapon + specialization"
+  },
+  "platforms": {
+    "light_infantry": {
+      "height": 1.8,
+      "footprint": 1.0,
+      "locomotionClass": "infantry",
+      "speed": 1.05,
+      "baseSignature": 18,
+      "emission": false,
+      "sensorStrength": 34,
+      "sensorRange": 6,
+      "sensorResolution": 34,
+      "durability": 80,
+      "armorFront": 0,
+      "armorOther": 0,
+      "supplyCapacity": 24
+    },
+    "combat_infantry": {
+      "height": 1.8,
+      "footprint": 1.2,
+      "locomotionClass": "infantry",
+      "speed": 0.95,
+      "baseSignature": 22,
+      "emission": false,
+      "sensorStrength": 30,
+      "sensorRange": 5,
+      "sensorResolution": 30,
+      "durability": 100,
+      "armorFront": 2,
+      "armorOther": 1,
+      "supplyCapacity": 32
+    },
+    "light_tracked": {
+      "height": 2.2,
+      "footprint": 4.0,
+      "locomotionClass": "tracked",
+      "speed": 1.2,
+      "baseSignature": 50,
+      "emission": false,
+      "sensorStrength": 30,
+      "sensorRange": 7,
+      "sensorResolution": 34,
+      "durability": 220,
+      "armorFront": 12,
+      "armorOther": 6,
+      "supplyCapacity": 48
+    },
+    "heavy_walker": {
+      "height": 5.0,
+      "footprint": 9.0,
+      "locomotionClass": "walker",
+      "speed": 0.65,
+      "baseSignature": 82,
+      "emission": false,
+      "sensorStrength": 36,
+      "sensorRange": 8,
+      "sensorResolution": 40,
+      "durability": 500,
+      "armorFront": 28,
+      "armorOther": 14,
+      "supplyCapacity": 56
+    },
+    "air_drone": {
+      "height": 8.0,
+      "footprint": 1.5,
+      "locomotionClass": "air",
+      "speed": 2.2,
+      "baseSignature": 36,
+      "emission": false,
+      "sensorStrength": 46,
+      "sensorRange": 10,
+      "sensorResolution": 58,
+      "durability": 100,
+      "armorFront": 2,
+      "armorOther": 2,
+      "supplyCapacity": 18
+    }
+  },
+  "weapons": {
+    "carbine": {
+      "weaponRange": 4,
+      "damage": 16,
+      "accuracy": 0.66,
+      "suppressionPower": 8,
+      "rateOfFire": 1.5
+    },
+    "rifle": {
+      "weaponRange": 6,
+      "damage": 20,
+      "accuracy": 0.7,
+      "suppressionPower": 10,
+      "rateOfFire": 1.0
+    },
+    "machine_gun": {
+      "weaponRange": 6,
+      "damage": 12,
+      "accuracy": 0.56,
+      "suppressionPower": 26,
+      "rateOfFire": 4.0
+    },
+    "autocannon": {
+      "weaponRange": 8,
+      "damage": 30,
+      "accuracy": 0.65,
+      "suppressionPower": 18,
+      "rateOfFire": 2.0
+    },
+    "heavy_cannon": {
+      "weaponRange": 10,
+      "damage": 60,
+      "accuracy": 0.72,
+      "suppressionPower": 35,
+      "rateOfFire": 0.4
+    },
+    "none": {
+      "weaponRange": 0,
+      "damage": 0,
+      "accuracy": 0.0,
+      "suppressionPower": 0,
+      "rateOfFire": 0.0
+    }
+  },
+  "specializations": {
+    "recon_package": {
+      "add": {
+        "sensorStrength": 20,
+        "sensorRange": 2,
+        "sensorResolution": 24
+      },
+      "multiply": {
+        "baseSignature": 0.8
+      }
+    },
+    "armor_package": {
+      "add": {
+        "armorFront": 4,
+        "armorOther": 2
+      },
+      "multiply": {
+        "durability": 1.25,
+        "speed": 0.9,
+        "baseSignature": 1.1
+      }
+    },
+    "ammo_package": {
+      "add": {},
+      "multiply": {
+        "supplyCapacity": 1.8,
+        "baseSignature": 1.05
+      }
+    },
+    "signature_reduction_package": {
+      "add": {},
+      "multiply": {
+        "baseSignature": 0.65
+      }
+    },
+    "fire_control_package": {
+      "add": {
+        "accuracy": 0.08
+      },
+      "multiply": {
+        "baseSignature": 1.04
+      }
+    },
+    "cargo_package": {
+      "add": {
+        "supplyCapacity": 220
+      },
+      "multiply": {
+        "speed": 0.9,
+        "baseSignature": 1.1
+      }
+    }
+  },
+  "test_configurations": {
+    "recon_infantry": {
+      "platform": "light_infantry",
+      "weapon": "carbine",
+      "specialization": "recon_package",
+      "test_role": "Low-signature observer that can survive light contact but should avoid line combat."
+    },
+    "line_infantry": {
+      "platform": "combat_infantry",
+      "weapon": "rifle",
+      "specialization": "armor_package",
+      "test_role": "General-purpose infantry configuration for open/covered line fighting."
+    },
+    "suppression_infantry": {
+      "platform": "combat_infantry",
+      "weapon": "machine_gun",
+      "specialization": "ammo_package",
+      "test_role": "High sustained suppression at the cost of rapid supply expenditure."
+    },
+    "tracked_raider": {
+      "platform": "light_tracked",
+      "weapon": "autocannon",
+      "specialization": "signature_reduction_package",
+      "test_role": "Fast ground platform for flanking, ambushes and attacks on logistics."
+    },
+    "assault_walker": {
+      "platform": "heavy_walker",
+      "weapon": "heavy_cannon",
+      "specialization": "fire_control_package",
+      "test_role": "Heavy breakthrough platform with strong frontal armor, long reach and poor concealment."
+    },
+    "recon_drone": {
+      "platform": "air_drone",
+      "weapon": "none",
+      "specialization": "recon_package",
+      "test_role": "Fast long-range observation platform; tests air locomotion and information warfare."
+    },
+    "tracked_supply_carrier": {
+      "platform": "light_tracked",
+      "weapon": "none",
+      "specialization": "cargo_package",
+      "test_role": "Physical, destructible supply node using the same chassis as the raider."
+    }
+  },
+  "resolved_test_units": {
+    "recon_infantry": {
+      "height": 1.8,
+      "footprint": 1.0,
+      "locomotionClass": "infantry",
+      "speed": 1.05,
+      "baseSignature": 14.4,
+      "emission": false,
+      "sensorStrength": 54,
+      "sensorRange": 8,
+      "sensorResolution": 58,
+      "durability": 80,
+      "armorFront": 0,
+      "armorOther": 0,
+      "supplyCapacity": 24,
+      "weaponRange": 4,
+      "damage": 16,
+      "accuracy": 0.66,
+      "suppressionPower": 8,
+      "rateOfFire": 1.5,
+      "size": 1.8,
+      "weight": 1.8,
+      "supplyState": 24
+    },
+    "line_infantry": {
+      "height": 1.8,
+      "footprint": 1.2,
+      "locomotionClass": "infantry",
+      "speed": 0.855,
+      "baseSignature": 24.2,
+      "emission": false,
+      "sensorStrength": 30,
+      "sensorRange": 5,
+      "sensorResolution": 30,
+      "durability": 125.0,
+      "armorFront": 6,
+      "armorOther": 3,
+      "supplyCapacity": 32,
+      "weaponRange": 6,
+      "damage": 20,
+      "accuracy": 0.7,
+      "suppressionPower": 10,
+      "rateOfFire": 1.0,
+      "size": 2.16,
+      "weight": 2.16,
+      "supplyState": 32
+    },
+    "suppression_infantry": {
+      "height": 1.8,
+      "footprint": 1.2,
+      "locomotionClass": "infantry",
+      "speed": 0.95,
+      "baseSignature": 23.1,
+      "emission": false,
+      "sensorStrength": 30,
+      "sensorRange": 5,
+      "sensorResolution": 30,
+      "durability": 100,
+      "armorFront": 2,
+      "armorOther": 1,
+      "supplyCapacity": 57.6,
+      "weaponRange": 6,
+      "damage": 12,
+      "accuracy": 0.56,
+      "suppressionPower": 26,
+      "rateOfFire": 4.0,
+      "size": 2.16,
+      "weight": 2.16,
+      "supplyState": 57.6
+    },
+    "tracked_raider": {
+      "height": 2.2,
+      "footprint": 4.0,
+      "locomotionClass": "tracked",
+      "speed": 1.2,
+      "baseSignature": 32.5,
+      "emission": false,
+      "sensorStrength": 30,
+      "sensorRange": 7,
+      "sensorResolution": 34,
+      "durability": 220,
+      "armorFront": 12,
+      "armorOther": 6,
+      "supplyCapacity": 48,
+      "weaponRange": 8,
+      "damage": 30,
+      "accuracy": 0.65,
+      "suppressionPower": 18,
+      "rateOfFire": 2.0,
+      "size": 8.8,
+      "weight": 8.8,
+      "supplyState": 48
+    },
+    "assault_walker": {
+      "height": 5.0,
+      "footprint": 9.0,
+      "locomotionClass": "walker",
+      "speed": 0.65,
+      "baseSignature": 85.28,
+      "emission": false,
+      "sensorStrength": 36,
+      "sensorRange": 8,
+      "sensorResolution": 40,
+      "durability": 500,
+      "armorFront": 28,
+      "armorOther": 14,
+      "supplyCapacity": 56,
+      "weaponRange": 10,
+      "damage": 60,
+      "accuracy": 0.8,
+      "suppressionPower": 35,
+      "rateOfFire": 0.4,
+      "size": 45.0,
+      "weight": 45.0,
+      "supplyState": 56
+    },
+    "recon_drone": {
+      "height": 8.0,
+      "footprint": 1.5,
+      "locomotionClass": "air",
+      "speed": 2.2,
+      "baseSignature": 28.8,
+      "emission": false,
+      "sensorStrength": 66,
+      "sensorRange": 12,
+      "sensorResolution": 82,
+      "durability": 100,
+      "armorFront": 2,
+      "armorOther": 2,
+      "supplyCapacity": 18,
+      "weaponRange": 0,
+      "damage": 0,
+      "accuracy": 0.0,
+      "suppressionPower": 0,
+      "rateOfFire": 0.0,
+      "size": 12.0,
+      "weight": 12.0,
+      "supplyState": 18
+    },
+    "tracked_supply_carrier": {
+      "height": 2.2,
+      "footprint": 4.0,
+      "locomotionClass": "tracked",
+      "speed": 1.08,
+      "baseSignature": 55.0,
+      "emission": false,
+      "sensorStrength": 30,
+      "sensorRange": 7,
+      "sensorResolution": 34,
+      "durability": 220,
+      "armorFront": 12,
+      "armorOther": 6,
+      "supplyCapacity": 268,
+      "weaponRange": 0,
+      "damage": 0,
+      "accuracy": 0.0,
+      "suppressionPower": 0,
+      "rateOfFire": 0.0,
+      "size": 8.8,
+      "weight": 8.8,
+      "supplyState": 268
+    }
+  }
+}
