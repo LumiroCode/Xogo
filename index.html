@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RTS AI — izometryczny prototyp 2D</title>
+  <link rel="stylesheet" href="./assets/ui/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="game" aria-label="Pole bitwy"></canvas>
+    <div id="topbar">
+      <strong>RTS AI // renderer 2D</strong>
+      <span id="status">inicjalizacja…</span>
+    </div>
+    <aside id="hud">
+      <div class="hud-title" id="unit-name">Brak zaznaczenia</div>
+      <div id="unit-stats" class="hud-body">LPM: wybór · PPM: ruch · kółko: zoom · WASD: kamera</div>
+    </aside>
+    <div id="legend">
+      <span><kbd>V</kbd> sensory</span><span><kbd>G</kbd> siatka</span><span><kbd>H</kbd> wysokość</span><span><kbd>F</kbd> FOW</span>
+    </div>
+    <div id="loading">Ładowanie danych…</div>
+  </div>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

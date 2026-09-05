@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.1-mvp",
+  "schema_version": "0.3-mvp",
   "units": {
     "height": "abstract height units",
     "footprint": "abstract ground-area units",
@@ -30,7 +30,8 @@
     "coverUsage": "not a unit stat; effective cover depends on terrain cover and unit size",
     "fuel": "not in MVP",
     "cohesion": "not in MVP",
-    "assembly": "platform + weapon + specialization"
+    "assembly": "platform + weapon + specialization",
+    "ammo_capacity_mvp_note": "Platform supply capacities multiplied by 4 vs MVP 0.2 to shift supply from firefight micro toward operational endurance."
   },
   "platforms": {
     "light_infantry": {
@@ -46,7 +47,7 @@
       "durability": 80,
       "armorFront": 0,
       "armorOther": 0,
-      "supplyCapacity": 24
+      "supplyCapacity": 96
     },
     "combat_infantry": {
       "height": 1.8,
@@ -61,7 +62,7 @@
       "durability": 100,
       "armorFront": 2,
       "armorOther": 1,
-      "supplyCapacity": 32
+      "supplyCapacity": 128
     },
     "light_tracked": {
       "height": 2.2,
@@ -76,7 +77,7 @@
       "durability": 220,
       "armorFront": 12,
       "armorOther": 6,
-      "supplyCapacity": 48
+      "supplyCapacity": 192
     },
     "heavy_walker": {
       "height": 5.0,
@@ -91,7 +92,7 @@
       "durability": 500,
       "armorFront": 28,
       "armorOther": 14,
-      "supplyCapacity": 56
+      "supplyCapacity": 224
     },
     "air_drone": {
       "height": 8.0,
@@ -106,7 +107,7 @@
       "durability": 100,
       "armorFront": 2,
       "armorOther": 2,
-      "supplyCapacity": 18
+      "supplyCapacity": 72
     }
   },
   "weapons": {
@@ -115,42 +116,70 @@
       "damage": 16,
       "accuracy": 0.66,
       "suppressionPower": 8,
-      "rateOfFire": 1.5
+      "rateOfFire": 1.5,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false
     },
     "rifle": {
       "weaponRange": 6,
       "damage": 20,
       "accuracy": 0.7,
       "suppressionPower": 10,
-      "rateOfFire": 1.0
+      "rateOfFire": 1.0,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false
     },
     "machine_gun": {
       "weaponRange": 6,
       "damage": 12,
       "accuracy": 0.56,
       "suppressionPower": 26,
-      "rateOfFire": 4.0
+      "rateOfFire": 4.0,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false
     },
     "autocannon": {
       "weaponRange": 8,
       "damage": 30,
       "accuracy": 0.65,
       "suppressionPower": 18,
-      "rateOfFire": 2.0
+      "rateOfFire": 2.0,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false
     },
     "heavy_cannon": {
       "weaponRange": 10,
       "damage": 60,
       "accuracy": 0.72,
       "suppressionPower": 35,
-      "rateOfFire": 0.4
+      "rateOfFire": 0.4,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false
     },
     "none": {
       "weaponRange": 0,
       "damage": 0,
       "accuracy": 0.0,
       "suppressionPower": 0,
-      "rateOfFire": 0.0
+      "rateOfFire": 0.0,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false
+    },
+    "artillery": {
+      "weaponRange": 14,
+      "minRange": 4,
+      "damage": 72,
+      "accuracy": 0.58,
+      "suppressionPower": 68,
+      "rateOfFire": 0.18,
+      "blastRadius": 1.15,
+      "indirectFire": true
     }
   },
   "specializations": {
@@ -248,6 +277,12 @@
       "weapon": "none",
       "specialization": "cargo_package",
       "test_role": "Physical, destructible supply node using the same chassis as the raider."
+    },
+    "tracked_artillery": {
+      "platform": "light_tracked",
+      "weapon": "artillery",
+      "specialization": "ammo_package",
+      "test_role": "Long-range indirect fire platform; validates attack-ground, suppression and counter-battery/logistics pressure."
     }
   },
   "resolved_test_units": {
@@ -264,15 +299,20 @@
       "durability": 80,
       "armorFront": 0,
       "armorOther": 0,
-      "supplyCapacity": 24,
+      "supplyCapacity": 96,
       "weaponRange": 4,
       "damage": 16,
       "accuracy": 0.66,
       "suppressionPower": 8,
       "rateOfFire": 1.5,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false,
       "size": 1.8,
       "weight": 1.8,
-      "supplyState": 24
+      "supplyState": 96,
+      "weaponId": "carbine",
+      "specializationId": "recon_package"
     },
     "line_infantry": {
       "height": 1.8,
@@ -287,15 +327,20 @@
       "durability": 125.0,
       "armorFront": 6,
       "armorOther": 3,
-      "supplyCapacity": 32,
+      "supplyCapacity": 128,
       "weaponRange": 6,
       "damage": 20,
       "accuracy": 0.7,
       "suppressionPower": 10,
       "rateOfFire": 1.0,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false,
       "size": 2.16,
       "weight": 2.16,
-      "supplyState": 32
+      "supplyState": 128,
+      "weaponId": "rifle",
+      "specializationId": "armor_package"
     },
     "suppression_infantry": {
       "height": 1.8,
@@ -310,15 +355,20 @@
       "durability": 100,
       "armorFront": 2,
       "armorOther": 1,
-      "supplyCapacity": 57.6,
+      "supplyCapacity": 230.4,
       "weaponRange": 6,
       "damage": 12,
       "accuracy": 0.56,
       "suppressionPower": 26,
       "rateOfFire": 4.0,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false,
       "size": 2.16,
       "weight": 2.16,
-      "supplyState": 57.6
+      "supplyState": 230.4,
+      "weaponId": "machine_gun",
+      "specializationId": "ammo_package"
     },
     "tracked_raider": {
       "height": 2.2,
@@ -333,15 +383,20 @@
       "durability": 220,
       "armorFront": 12,
       "armorOther": 6,
-      "supplyCapacity": 48,
+      "supplyCapacity": 192,
       "weaponRange": 8,
       "damage": 30,
       "accuracy": 0.65,
       "suppressionPower": 18,
       "rateOfFire": 2.0,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false,
       "size": 8.8,
       "weight": 8.8,
-      "supplyState": 48
+      "supplyState": 192,
+      "weaponId": "autocannon",
+      "specializationId": "signature_reduction_package"
     },
     "assault_walker": {
       "height": 5.0,
@@ -356,15 +411,20 @@
       "durability": 500,
       "armorFront": 28,
       "armorOther": 14,
-      "supplyCapacity": 56,
+      "supplyCapacity": 224,
       "weaponRange": 10,
       "damage": 60,
       "accuracy": 0.8,
       "suppressionPower": 35,
       "rateOfFire": 0.4,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false,
       "size": 45.0,
       "weight": 45.0,
-      "supplyState": 56
+      "supplyState": 224,
+      "weaponId": "heavy_cannon",
+      "specializationId": "fire_control_package"
     },
     "recon_drone": {
       "height": 8.0,
@@ -379,15 +439,20 @@
       "durability": 100,
       "armorFront": 2,
       "armorOther": 2,
-      "supplyCapacity": 18,
+      "supplyCapacity": 72,
       "weaponRange": 0,
       "damage": 0,
       "accuracy": 0.0,
       "suppressionPower": 0,
       "rateOfFire": 0.0,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false,
       "size": 12.0,
       "weight": 12.0,
-      "supplyState": 18
+      "supplyState": 72,
+      "weaponId": "none",
+      "specializationId": "recon_package"
     },
     "tracked_supply_carrier": {
       "height": 2.2,
@@ -402,15 +467,48 @@
       "durability": 220,
       "armorFront": 12,
       "armorOther": 6,
-      "supplyCapacity": 268,
+      "supplyCapacity": 412,
       "weaponRange": 0,
       "damage": 0,
       "accuracy": 0.0,
       "suppressionPower": 0,
       "rateOfFire": 0.0,
+      "minRange": 0,
+      "blastRadius": 0,
+      "indirectFire": false,
       "size": 8.8,
       "weight": 8.8,
-      "supplyState": 268
+      "supplyState": 412,
+      "weaponId": "none",
+      "specializationId": "cargo_package"
+    },
+    "tracked_artillery": {
+      "height": 2.2,
+      "footprint": 4.0,
+      "locomotionClass": "tracked",
+      "speed": 1.2,
+      "baseSignature": 52.5,
+      "emission": false,
+      "sensorStrength": 30,
+      "sensorRange": 7,
+      "sensorResolution": 34,
+      "durability": 220,
+      "armorFront": 12,
+      "armorOther": 6,
+      "supplyCapacity": 345.6,
+      "weaponRange": 14,
+      "minRange": 4,
+      "damage": 72,
+      "accuracy": 0.58,
+      "suppressionPower": 68,
+      "rateOfFire": 0.18,
+      "blastRadius": 1.15,
+      "indirectFire": true,
+      "size": 8.8,
+      "weight": 8.8,
+      "supplyState": 345.6,
+      "weaponId": "artillery",
+      "specializationId": "ammo_package"
     }
   }
 }

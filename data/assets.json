@@ -1,0 +1,20 @@
+{
+  "notes": "Runtime is pure 2D. Current SVGs are proxy sprites with stable visual keys; replace them with prerendered Quaternius PNG/WebP without touching gameplay code.",
+  "quaterniusPacks": {
+    "tanks": "Animated Tanks Pack",
+    "mechs": "Animated Mech Pack",
+    "scifi": "Sci-Fi Essentials Kit",
+    "nature": "Ultimate Stylized Nature Pack"
+  },
+  "visuals": {
+    "infantry": {"file":"./assets/sprites/infantry.svg","width":54,"height":62,"sourcePack":"Sci-Fi Essentials / modular characters","status":"proxy"},
+    "mech": {"file":"./assets/sprites/mech.svg","width":82,"height":92,"sourcePack":"Animated Mech Pack","status":"proxy"},
+    "artillery": {"file":"./assets/sprites/artillery.svg","width":92,"height":58,"sourcePack":"Animated Tanks Pack","status":"proxy"},
+    "supply": {"file":"./assets/sprites/supply.svg","width":84,"height":58,"sourcePack":"Sci-Fi/vehicle candidate","status":"proxy"},
+    "drone": {"file":"./assets/sprites/drone.svg","width":66,"height":52,"sourcePack":"Sci-Fi Essentials Kit","status":"proxy"},
+    "enemy_mech": {"file":"./assets/sprites/enemy_mech.svg","width":86,"height":94,"sourcePack":"Animated Mech Pack","status":"proxy"},
+    "enemy_tank": {"file":"./assets/sprites/enemy_tank.svg","width":94,"height":62,"sourcePack":"Animated Tanks Pack","status":"proxy"},
+    "tree": {"file":"./assets/sprites/tree.svg","width":82,"height":112,"sourcePack":"Ultimate Stylized Nature Pack","status":"proxy"},
+    "rock": {"file":"./assets/sprites/rock.svg","width":70,"height":48,"sourcePack":"Ultimate Stylized Nature Pack","status":"proxy"}
+  }
+}
