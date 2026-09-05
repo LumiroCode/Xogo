@@ -1,0 +1,129 @@
+{
+  "units": [
+    {
+      "id": "h-recon-inf",
+      "configuration": "recon_infantry",
+      "faction": "human",
+      "x": 7.0,
+      "y": 15.8,
+      "hp": 63,
+      "suppression": 12,
+      "supplyState": 74
+    },
+    {
+      "id": "h-line-inf",
+      "configuration": "line_infantry",
+      "faction": "human",
+      "x": 8.1,
+      "y": 16.3,
+      "hp": 111,
+      "suppression": 34,
+      "supplyState": 98
+    },
+    {
+      "id": "h-suppress",
+      "configuration": "suppression_infantry",
+      "faction": "human",
+      "x": 9.0,
+      "y": 15.2,
+      "hp": 84,
+      "suppression": 57,
+      "supplyState": 126
+    },
+    {
+      "id": "h-raider",
+      "configuration": "tracked_raider",
+      "faction": "human",
+      "x": 8.3,
+      "y": 13.7,
+      "hp": 176,
+      "suppression": 18,
+      "supplyState": 112
+    },
+    {
+      "id": "h-walker",
+      "configuration": "assault_walker",
+      "faction": "human",
+      "x": 10.3,
+      "y": 14.2,
+      "hp": 386,
+      "suppression": 24,
+      "supplyState": 160
+    },
+    {
+      "id": "h-drone",
+      "configuration": "recon_drone",
+      "faction": "human",
+      "x": 11.5,
+      "y": 12.7,
+      "hp": 82,
+      "suppression": 6,
+      "supplyState": 48
+    },
+    {
+      "id": "h-supply",
+      "configuration": "tracked_supply_carrier",
+      "faction": "human",
+      "x": 6.1,
+      "y": 16.5,
+      "hp": 205,
+      "suppression": 8,
+      "supplyState": 307
+    },
+    {
+      "id": "h-artillery",
+      "configuration": "tracked_artillery",
+      "faction": "human",
+      "x": 5.4,
+      "y": 14.6,
+      "hp": 190,
+      "suppression": 43,
+      "supplyState": 173
+    },
+    {
+      "id": "m-custom-1",
+      "assembly": {
+        "platform": "light_tracked",
+        "weapon": "machine_gun",
+        "specialization": "recon_package"
+      },
+      "label": "Machine recon carrier",
+      "faction": "machine",
+      "x": 18.5,
+      "y": 8.5,
+      "hp": 175,
+      "suppression": 15,
+      "supplyState": 120
+    },
+    {
+      "id": "m-custom-2",
+      "assembly": {
+        "platform": "heavy_walker",
+        "weapon": "autocannon",
+        "specialization": "armor_package"
+      },
+      "label": "Machine armored walker",
+      "faction": "machine",
+      "x": 21.0,
+      "y": 10.8,
+      "hp": 430,
+      "suppression": 22,
+      "supplyState": 150
+    },
+    {
+      "id": "m-custom-3",
+      "assembly": {
+        "platform": "light_tracked",
+        "weapon": "heavy_cannon",
+        "specialization": "fire_control_package"
+      },
+      "label": "Machine gun carrier",
+      "faction": "machine",
+      "x": 23.0,
+      "y": 7.8,
+      "hp": 160,
+      "suppression": 38,
+      "supplyState": 84
+    }
+  ]
+}

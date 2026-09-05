@@ -1,0 +1,132 @@
+{
+  "schema_version": "0.1-presentation",
+  "notes": "Domain field names live here, outside IsoRenderer. PresentationBinder resolves these paths into generic visual indicators before state reaches the renderer.",
+  "entity": {
+    "fields": {
+      "id": "id",
+      "visual": "visual",
+      "x": "x",
+      "y": "y",
+      "z": "z",
+      "visibility": "visibility",
+      "selectable": {
+        "select": {
+          "source": "faction",
+          "values": {
+            "human": true,
+            "machine": false
+          },
+          "default": false
+        }
+      },
+      "spriteFilter": {
+        "select": {
+          "source": "faction",
+          "values": {
+            "machine": "hue-rotate(155deg) saturate(1.15)"
+          },
+          "default": ""
+        }
+      },
+      "sensorOverlayRadius": {
+        "select": {
+          "source": "faction",
+          "values": {
+            "human": {
+              "source": "sensorRange"
+            }
+          },
+          "default": 0
+        }
+      }
+    },
+    "appendIndicatorsFrom": "presentationIndicators",
+    "indicators": [
+      {
+        "id": "primary-integrity",
+        "kind": "bar",
+        "current": {
+          "source": "hp"
+        },
+        "max": {
+          "source": "maxHp"
+        },
+        "placement": "above",
+        "direction": "left-to-right",
+        "length": 54,
+        "thickness": 5,
+        "foreground": {
+          "select": {
+            "source": "faction",
+            "values": {
+              "human": {
+                "type": "color",
+                "value": "#75c997"
+              },
+              "machine": {
+                "type": "color",
+                "value": "#df726b"
+              }
+            },
+            "default": {
+              "type": "color",
+              "value": "#d7d7d7"
+            }
+          }
+        },
+        "background": {
+          "type": "color",
+          "value": "rgba(0,0,0,.68)"
+        }
+      },
+      {
+        "id": "secondary-load",
+        "kind": "bar",
+        "current": {
+          "source": "suppression"
+        },
+        "max": {
+          "source": "maxSuppression"
+        },
+        "placement": "below",
+        "direction": "left-to-right",
+        "length": 48,
+        "thickness": 4,
+        "foreground": {
+          "type": "color",
+          "value": "#f0c85b"
+        },
+        "background": {
+          "type": "color",
+          "value": "rgba(0,0,0,.55)"
+        }
+      },
+      {
+        "id": "resource-pips",
+        "kind": "pips",
+        "current": {
+          "source": "supplyState"
+        },
+        "max": {
+          "source": "supplyCapacity"
+        },
+        "segments": 4,
+        "segmentFill": "discrete",
+        "placement": "inside-top-right",
+        "direction": "left-to-right",
+        "cellWidth": 10,
+        "cellHeight": 10,
+        "gap": 2,
+        "margin": 4,
+        "foreground": {
+          "type": "graphic",
+          "key": "ammo_pip"
+        },
+        "background": {
+          "type": "color",
+          "value": "#922d2a"
+        }
+      }
+    ]
+  }
+}

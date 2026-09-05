@@ -1,6 +1,70 @@
-# RTS AI — 2D isometric renderer prototype
+# RTS AI — modularny renderer 2D isometric
 
-Mały, niezależny renderer/shell dla przyszłej logiki RTS. Runtime używa wyłącznie Canvas 2D i danych JSON; nie ładuje modeli 3D.
+Warstwa prezentacji dla prototypu RTS-a. Runtime używa Canvas 2D, modularnych proxy SVG i konfiguracji JSON.
+
+## Architektura
+
+```text
+Simulation / gameplay / ML
+        │
+        │ arbitrary state
+        ▼
+PresentationBinder
+        │  data/presentation_bindings.json
+        │
+        │ generic visual state
+        ▼
+GameViewAdapter → Scene → IsoRenderer
+                         │
+                         ├─ ModularSpriteComposer
+                         ├─ terrain/elevation
+                         ├─ FOW / contacts / last-known
+                         ├─ generic indicators
+                         └─ picking / camera
+```
+
+### Ważna granica
+
+`IsoRenderer` **nie zna** pól takich jak HP, supresja czy amunicja.
+
+Ich nazwy występują w domenowym stanie gry oraz w `data/presentation_bindings.json`. `PresentationBinder` zamienia je na generyczne:
+
+```text
+current / max / bar / pips / foreground / background / placement / direction
+```
+
+Dzięki temu dodanie nowego stanu jednostki nie wymaga zmiany renderera.
+
+W aktualnym buildzie ta sama warstwa ukrywa przed rendererem również `faction` i `sensorRange`: renderer dostaje już tylko prezentacyjne `selectable`, `spriteFilter` i `sensorOverlayRadius`.
+
+## Modularne jednostki
+
+Wygląd powstaje z:
+
+```text
+platform + weapon + specialization
+```
+
+`src/engine/ModularSpriteComposer.js` składa trzy warstwy przez sockety montażowe i cache'uje wynik. Obecny katalog zawiera 5 platform, 7 broni i 6 specjalizacji — 210 możliwych kompozytów przy 18 SVG proxy.
+
+## Generyczne wskaźniki
+
+`IsoRenderer` obsługuje:
+
+- `bar`,
+- `pips` / `segments`,
+- foreground/background jako kolor lub grafikę,
+- pozycje nad/pod/po bokach oraz w czterech rogach wewnątrz sprite'a,
+- cztery kierunki wypełniania,
+- pola częściowo wypełniane lub dyskretne pełne/puste.
+
+Demo binding pokazuje obecnie trzy domenowe wartości jako:
+
+- pasek nad jednostką,
+- pasek pod jednostką,
+- czteropolowy wskaźnik w prawym górnym rogu.
+
+To, **co te trzy wartości oznaczają**, jest zdefiniowane poza rendererem w `data/presentation_bindings.json`.
 
 ## Uruchomienie
 
@@ -8,30 +72,26 @@ Mały, niezależny renderer/shell dla przyszłej logiki RTS. Runtime używa wył
 python serve.py
 ```
 
-Następnie otwórz `http://127.0.0.1:8765/` (skrypt próbuje otworzyć przeglądarkę automatycznie).
+- prototyp: `http://127.0.0.1:8765/`
+- galeria modułów: `http://127.0.0.1:8765/gallery.html`
 
 ## Sterowanie
 
-- LPM — wybór jednostki ludzi.
-- PPM — rozkaz ruchu.
-- Shift+LPM lub środkowy przycisk — przesuwanie kamery.
-- Kółko — zoom.
-- WASD / strzałki — kamera.
-- V — zasięgi sensorów.
-- G — siatka.
-- H — wysokość terenu.
+- LPM — wybór jednostki ludzi,
+- PPM — ruch,
+- Shift+LPM lub środkowy — kamera,
+- kółko — zoom,
+- WASD / strzałki — kamera,
+- V — sensory,
+- G — siatka,
+- H — wysokość,
 - F — fog of war.
 
-## Architektura
+## Dane
 
-`src/engine/*` nie zna zasad RTS. `GameViewAdapter` jest jedyną granicą między symulacją i obrazem. `DemoSimulation` jest wymiennym klientem renderera i istnieje wyłącznie po to, aby prototyp dało się uruchomić bez właściwego MVP.
-
-Publiczny kontrakt prezentacji: `setMap`, `spawnEntity`, `updateEntity`, `removeEntity`, `setSelection`, `setVisibility`, `pick`, `screenToWorld`, `render`.
-
-Dane mapy i definicje demo są w `data/`. Sprite'y i UI są w `assets/`.
-
-## Quaternius
-
-`data/assets.json` ma stabilne klucze i mapowanie do wybranych paczek Quaterniusa. Dołączone SVG są **proxy**, nie assetami Quaterniusa. Docelowy pipeline jest opisany w `tools/quaternius_pipeline.md`: model 3D służy wyłącznie do wygenerowania izometrycznych sprite'ów 2D, które można podmienić bez zmiany logiki.
-
-Powód pozostawienia surowych modeli poza tym repozytorium/prototypem: oddzielenie source art od gotowego produktu i uniknięcie redystrybucji paczek jako samodzielnych assetów. Przed publikacją komercyjną należy utrwalić wersję licencji właściwą dla pobranych paczek.
+- `data/unit_definitions.json` — schemat jednostek MVP,
+- `data/terrain_presets.json` — presety terenu,
+- `data/demo_units.json` — instancje testowe,
+- `data/map.json` — mapa,
+- `data/assets.json` — moduły graficzne, sockety, terrain styles i indicator graphics,
+- `data/presentation_bindings.json` — mapowanie dowolnego stanu domenowego na generyczny stan wizualny.

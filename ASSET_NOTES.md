@@ -1,5 +1,13 @@
 # Asset notes
 
-Stan na 2026-09-04: strony Animated Tanks Pack, Animated Mech Pack, Sci-Fi Essentials Kit i Ultimate Stylized Nature Pack opisują darmowe części paczek jako możliwe do użycia komercyjnie i oznaczają je jako CC0. Jednocześnie Quaternius opublikował 2026-08-28 ogólną Quaternius Asset License (QAL) v1.0, która pozwala używać assetów w produktach, ale zabrania redystrybucji samych assetów jako assetów.
+Aktualny prototyp nie zawiera modeli ani sprite'ów Quaterniusa. Wszystkie grafiki jednostek w `assets/modules/` są własnymi SVG proxy wygenerowanymi na potrzeby testu modularnego renderera.
 
-Dlatego ten prototyp nie zawiera surowych modeli Quaterniusa. Docelowe prerendery należy wygenerować z legalnie pobranej kopii źródłowej i zachować snapshot informacji licencyjnej przy paczce.
+Docelowa integracja Quaterniusa powinna zastępować osobno:
+
+- platformy,
+- uzbrojenie,
+- pakiety specjalizacji,
+
+zamiast prerenderować każdą pełną konfigurację. Dzięki socketom i cache'owi liczba potrzebnych assetów rośnie liniowo wraz z katalogiem modułów.
+
+Surowe źródłowe modele 3D należy trzymać poza buildem runtime; do gry trafiają jedynie gotowe warstwy 2D.

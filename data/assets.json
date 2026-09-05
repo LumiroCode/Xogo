@@ -1,20 +1,283 @@
 {
-  "notes": "Runtime is pure 2D. Current SVGs are proxy sprites with stable visual keys; replace them with prerendered Quaternius PNG/WebP without touching gameplay code.",
-  "quaterniusPacks": {
-    "tanks": "Animated Tanks Pack",
-    "mechs": "Animated Mech Pack",
-    "scifi": "Sci-Fi Essentials Kit",
-    "nature": "Ultimate Stylized Nature Pack"
+  "notes": "Pure 2D runtime. Unit visuals are composed automatically from platform + weapon + specialization proxy SVG modules. Replace individual module SVGs with prerendered art later without changing game logic.",
+  "composition": {
+    "width": 160,
+    "height": 150,
+    "anchorX": 80,
+    "anchorY": 136
   },
-  "visuals": {
-    "infantry": {"file":"./assets/sprites/infantry.svg","width":54,"height":62,"sourcePack":"Sci-Fi Essentials / modular characters","status":"proxy"},
-    "mech": {"file":"./assets/sprites/mech.svg","width":82,"height":92,"sourcePack":"Animated Mech Pack","status":"proxy"},
-    "artillery": {"file":"./assets/sprites/artillery.svg","width":92,"height":58,"sourcePack":"Animated Tanks Pack","status":"proxy"},
-    "supply": {"file":"./assets/sprites/supply.svg","width":84,"height":58,"sourcePack":"Sci-Fi/vehicle candidate","status":"proxy"},
-    "drone": {"file":"./assets/sprites/drone.svg","width":66,"height":52,"sourcePack":"Sci-Fi Essentials Kit","status":"proxy"},
-    "enemy_mech": {"file":"./assets/sprites/enemy_mech.svg","width":86,"height":94,"sourcePack":"Animated Mech Pack","status":"proxy"},
-    "enemy_tank": {"file":"./assets/sprites/enemy_tank.svg","width":94,"height":62,"sourcePack":"Animated Tanks Pack","status":"proxy"},
-    "tree": {"file":"./assets/sprites/tree.svg","width":82,"height":112,"sourcePack":"Ultimate Stylized Nature Pack","status":"proxy"},
-    "rock": {"file":"./assets/sprites/rock.svg","width":70,"height":48,"sourcePack":"Ultimate Stylized Nature Pack","status":"proxy"}
+  "platforms": {
+    "light_infantry": {
+      "file": "./assets/modules/platforms/light_infantry.svg",
+      "draw": {
+        "x": 48,
+        "y": 43,
+        "width": 68,
+        "height": 91
+      },
+      "sockets": {
+        "weapon": {
+          "x": 82,
+          "y": 82,
+          "scale": 0.56
+        },
+        "specialization": {
+          "x": 65,
+          "y": 69,
+          "scale": 0.52
+        }
+      }
+    },
+    "combat_infantry": {
+      "file": "./assets/modules/platforms/combat_infantry.svg",
+      "draw": {
+        "x": 45,
+        "y": 40,
+        "width": 74,
+        "height": 96
+      },
+      "sockets": {
+        "weapon": {
+          "x": 84,
+          "y": 82,
+          "scale": 0.6
+        },
+        "specialization": {
+          "x": 64,
+          "y": 68,
+          "scale": 0.55
+        }
+      }
+    },
+    "light_tracked": {
+      "file": "./assets/modules/platforms/light_tracked.svg",
+      "draw": {
+        "x": 13,
+        "y": 42,
+        "width": 134,
+        "height": 96
+      },
+      "sockets": {
+        "weapon": {
+          "x": 83,
+          "y": 80,
+          "scale": 0.86
+        },
+        "specialization": {
+          "x": 58,
+          "y": 82,
+          "scale": 0.78
+        }
+      }
+    },
+    "heavy_walker": {
+      "file": "./assets/modules/platforms/heavy_walker.svg",
+      "draw": {
+        "x": 16,
+        "y": 16,
+        "width": 128,
+        "height": 122
+      },
+      "sockets": {
+        "weapon": {
+          "x": 91,
+          "y": 57,
+          "scale": 1.0
+        },
+        "specialization": {
+          "x": 63,
+          "y": 57,
+          "scale": 0.84
+        }
+      }
+    },
+    "air_drone": {
+      "file": "./assets/modules/platforms/air_drone.svg",
+      "draw": {
+        "x": 18,
+        "y": 31,
+        "width": 124,
+        "height": 106
+      },
+      "sockets": {
+        "weapon": {
+          "x": 82,
+          "y": 75,
+          "scale": 0.72
+        },
+        "specialization": {
+          "x": 70,
+          "y": 61,
+          "scale": 0.72
+        }
+      }
+    }
+  },
+  "weapons": {
+    "carbine": {
+      "file": "./assets/modules/weapons/carbine.svg",
+      "width": 96,
+      "height": 48,
+      "mount": {
+        "x": 24,
+        "y": 32
+      }
+    },
+    "rifle": {
+      "file": "./assets/modules/weapons/rifle.svg",
+      "width": 96,
+      "height": 48,
+      "mount": {
+        "x": 24,
+        "y": 32
+      }
+    },
+    "machine_gun": {
+      "file": "./assets/modules/weapons/machine_gun.svg",
+      "width": 96,
+      "height": 48,
+      "mount": {
+        "x": 24,
+        "y": 32
+      }
+    },
+    "autocannon": {
+      "file": "./assets/modules/weapons/autocannon.svg",
+      "width": 96,
+      "height": 48,
+      "mount": {
+        "x": 31,
+        "y": 32
+      }
+    },
+    "heavy_cannon": {
+      "file": "./assets/modules/weapons/heavy_cannon.svg",
+      "width": 96,
+      "height": 48,
+      "mount": {
+        "x": 31,
+        "y": 33
+      }
+    },
+    "none": {
+      "file": "./assets/modules/weapons/none.svg",
+      "width": 96,
+      "height": 48,
+      "mount": {
+        "x": 48,
+        "y": 25
+      },
+      "opacity": 0.0
+    },
+    "artillery": {
+      "file": "./assets/modules/weapons/artillery.svg",
+      "width": 96,
+      "height": 48,
+      "mount": {
+        "x": 30,
+        "y": 34
+      }
+    }
+  },
+  "specializations": {
+    "recon_package": {
+      "file": "./assets/modules/specializations/recon_package.svg",
+      "width": 72,
+      "height": 56,
+      "mount": {
+        "x": 36,
+        "y": 47
+      }
+    },
+    "armor_package": {
+      "file": "./assets/modules/specializations/armor_package.svg",
+      "width": 72,
+      "height": 56,
+      "mount": {
+        "x": 36,
+        "y": 45
+      }
+    },
+    "ammo_package": {
+      "file": "./assets/modules/specializations/ammo_package.svg",
+      "width": 72,
+      "height": 56,
+      "mount": {
+        "x": 36,
+        "y": 47
+      }
+    },
+    "signature_reduction_package": {
+      "file": "./assets/modules/specializations/signature_reduction_package.svg",
+      "width": 72,
+      "height": 56,
+      "mount": {
+        "x": 36,
+        "y": 46
+      }
+    },
+    "fire_control_package": {
+      "file": "./assets/modules/specializations/fire_control_package.svg",
+      "width": 72,
+      "height": 56,
+      "mount": {
+        "x": 36,
+        "y": 46
+      }
+    },
+    "cargo_package": {
+      "file": "./assets/modules/specializations/cargo_package.svg",
+      "width": 72,
+      "height": 56,
+      "mount": {
+        "x": 36,
+        "y": 48
+      }
+    }
+  },
+  "staticVisuals": {
+    "tree": {
+      "file": "./assets/sprites/tree.svg",
+      "width": 82,
+      "height": 112
+    },
+    "rock": {
+      "file": "./assets/sprites/rock.svg",
+      "width": 70,
+      "height": 48
+    }
+  },
+  "terrainStyles": {
+    "open": [
+      "#526b4c",
+      "#465e42"
+    ],
+    "road": [
+      "#686963",
+      "#5b5c57"
+    ],
+    "vegetation": [
+      "#3d5b42",
+      "#344e3a"
+    ],
+    "ruins": [
+      "#5d605c",
+      "#50534f"
+    ],
+    "soft_ground": [
+      "#74644f",
+      "#695a48"
+    ],
+    "rough_ground": [
+      "#626861",
+      "#555b55"
+    ]
+  },
+  "indicatorGraphics": {
+    "ammo_pip": {
+      "file": "./assets/ui/indicators/ammo_pip.svg",
+      "width": 24,
+      "height": 24
+    }
   }
 }

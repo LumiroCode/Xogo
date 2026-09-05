@@ -1,21 +1,24 @@
-# Quaternius → 2D sprite pipeline
+# Quaternius → modular 2D sprite pipeline
 
-Runtime gry jest celowo czystym 2D. Modele Quaterniusa są materiałem źródłowym do prerenderu, nie zależnością runtime.
+Runtime jest czystym Canvas 2D. Po zmianie na modularny renderer docelowy art powinien zastępować **moduły**, a nie gotowe konfiguracje jednostek.
 
-## Wybrane zestawy
-- Animated Mech Pack — walkery / ciężkie maszyny.
-- Animated Tanks Pack — pojazdy gąsienicowe / artyleria.
-- Sci‑Fi Essentials Kit — roboty, propsy, elementy sci‑fi.
-- Ultimate Stylized Nature Pack — drzewa, skały i dekoracje terenu.
+## Warstwy
 
-## Kontrakt renderu
-1. Import modelu FBX/glTF do Blendera.
-2. Ujednolicenie skali i punktu oparcia przy ziemi.
-3. Materiały zachowują paletę źródłową; frakcyjny tint/emissive powinien być nakładany osobno.
-4. Kamera ortograficzna w standardzie game-isometric 2:1; azymut 45°, około 30–35° elewacji.
-5. 8 kierunków (N, NE, E, SE, S, SW, W, NW), ten sam bounding box i anchor.
-6. Tło transparentne. Dla prototypu: 192×192 lub 256×256 na klatkę; WebP/PNG.
-7. Cień może być osobną warstwą lub generowany w rendererze (obecnie renderer generuje prosty cień).
-8. Wynik zastępuje SVG w `assets/sprites/`, a `data/assets.json` zachowuje te same klucze (`mech`, `artillery`, itd.).
+- `platforms/*` — korpus/platforma wraz z bazowym układem ruchu,
+- `weapons/*` — uzbrojenie z ustalonym punktem montażowym,
+- `specializations/*` — widoczny pakiet dodatkowy,
+- `data/assets.json` — sockety platform, skala warstw i mount-pointy modułów.
 
-To oznacza, że zmiana proxy → prawdziwy prerender Quaterniusa nie dotyka `DemoSimulation.js` ani przyszłej logiki gry.
+Dzięki temu liczba finalnych prerenderów rośnie liniowo z liczbą części, nie kombinatorycznie z liczbą loadoutów.
+
+## Docelowy workflow
+
+1. Import źródłowego modelu do Blendera.
+2. Ujednolicenie światła, kamery ortograficznej i palety dla wszystkich modułów.
+3. Platformę renderować bez uzbrojenia/specjalizacji.
+4. Weapon i specialization renderować osobno na transparentnym tle z zachowanym wspólnym kierunkiem izometrycznym.
+5. Ustalić mount point w pikselach oraz socket na każdej platformie.
+6. Eksport PNG/WebP; podmiana ścieżki w `data/assets.json`.
+7. Otworzyć `gallery.html` i sprawdzić całą macierz automatycznie.
+
+Obecne SVG są proxy. `ModularSpriteComposer` nie zależy od formatu źródłowego — można podmienić SVG na PNG/WebP bez dotykania logiki gry.
