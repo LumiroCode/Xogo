@@ -1,6 +1,6 @@
 {
-  "schema_version": "0.1-presentation",
-  "notes": "Domain field names live here, outside IsoRenderer. PresentationBinder resolves these paths into generic visual indicators before state reaches the renderer.",
+  "schema_version": "0.3-presentation",
+  "notes": "Domain state is translated into generic renderer state. intelLevel maps to presentation visibility modes; visualOpacity maps to generic opacity. Indicators are shown only for human units to avoid intel leakage.",
   "entity": {
     "fields": {
       "id": "id",
@@ -8,7 +8,20 @@
       "x": "x",
       "y": "y",
       "z": "z",
-      "visibility": "visibility",
+      "visibility": {
+        "select": {
+          "source": "intelLevel",
+          "values": {
+            "unknown": "hidden",
+            "contact": "contact",
+            "track": "track",
+            "fire_control": "fireControl",
+            "identified": "visible",
+            "last_known": "lastKnown"
+          },
+          "default": "hidden"
+        }
+      },
       "selectable": {
         "select": {
           "source": "faction",
@@ -38,7 +51,8 @@
           },
           "default": 0
         }
-      }
+      },
+      "opacity": "visualOpacity"
     },
     "appendIndicatorsFrom": "presentationIndicators",
     "indicators": [
@@ -77,6 +91,10 @@
         "background": {
           "type": "color",
           "value": "rgba(0,0,0,.68)"
+        },
+        "when": {
+          "source": "faction",
+          "equals": "human"
         }
       },
       {
@@ -99,6 +117,10 @@
         "background": {
           "type": "color",
           "value": "rgba(0,0,0,.55)"
+        },
+        "when": {
+          "source": "faction",
+          "equals": "human"
         }
       },
       {
@@ -125,6 +147,10 @@
         "background": {
           "type": "color",
           "value": "#922d2a"
+        },
+        "when": {
+          "source": "faction",
+          "equals": "human"
         }
       }
     ]

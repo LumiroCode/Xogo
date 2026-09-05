@@ -3,7 +3,7 @@ export class Input {
     this.canvas=canvas; this.camera=camera; this.hooks=hooks; this.keys=new Set(); this.drag=false; this.last=null;
     canvas.addEventListener('contextmenu', e=>e.preventDefault());
     canvas.addEventListener('pointerdown', e=>{
-      if(e.button===1 || (e.button===0 && e.shiftKey)) { this.drag=true; this.last={x:e.clientX,y:e.clientY}; canvas.setPointerCapture(e.pointerId); return; }
+      if(e.button===1 || (e.button===0 && e.altKey)) { this.drag=true; this.last={x:e.clientX,y:e.clientY}; canvas.setPointerCapture(e.pointerId); return; }
       hooks.pointerDown?.(e);
     });
     canvas.addEventListener('pointermove', e=>{

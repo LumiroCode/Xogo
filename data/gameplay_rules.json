@@ -1,0 +1,92 @@
+{
+  "schema_version": "0.3-gameplay",
+  "battlefield": {
+    "visibility": 1.0,
+    "mobility": 1.0,
+    "night_visibility": 0.45
+  },
+  "movement": {
+    "elevation_move_penalty": 0.14,
+    "slope_block_delta": {
+      "infantry": 4,
+      "tracked": 3,
+      "walker": 4,
+      "air": 999
+    },
+    "large_unit_size_threshold": 30,
+    "large_unit_slope_penalty_levels": 1
+  },
+  "signature": {
+    "emission_multiplier": 1.7,
+    "moving_multiplier": 1.22,
+    "firing_multiplier": 2.4,
+    "firing_seconds": 1.3,
+    "cover_max_reduction": 0.58,
+    "size_cover_scale": 7.0,
+    "local_cluster_radius": 0.85,
+    "local_cluster_step": 0.08,
+    "local_cluster_cap": 0.30
+  },
+  "los": {
+    "cover_occlusion_scale": 0.92,
+    "occlusion_limit": 1.35,
+    "elevation_margin": 0.15,
+    "sample_step": 0.20
+  },
+  "sensors": {
+    "visual_base_range": 1.5,
+    "visual_height_range_scale": 0.25,
+    "visual_elevation_range_scale": 0.45,
+    "visual_air_range_bonus": 4.0,
+    "visual_strength": 100,
+    "visual_resolution": 100,
+    "visual_close_identify_range": 0.45,
+    "visual_visibility_floor": 0.70,
+    "range_falloff_power": 1.35,
+    "strength_weight": 0.64,
+    "signature_weight": 0.36,
+    "contact_threshold": 0.18,
+    "track_threshold": 0.32,
+    "fire_control_threshold": 0.52,
+    "identification_threshold": 0.58,
+    "memory_seconds": 18
+  },
+  "combat": {
+    "suppression_decay_per_second": 8.0,
+    "suppression_accuracy_penalty": 0.65,
+    "suppression_move_penalty": 0.45,
+    "suppression_armor_scale": 55,
+    "suppression_size_scale": 24,
+    "cover_suppression_reduction": 0.70,
+    "front_armor_half_angle_deg": 65,
+    "weak_track_accuracy_min": 0.18,
+    "weak_track_accuracy_max": 0.52,
+    "fire_control_accuracy_min": 0.62,
+    "artillery_flight_time": 0.75,
+    "artillery_scatter_scale": 1.05,
+    "direct_attack_ground_radius": 0.45
+  },
+  "supply": {
+    "transfer_per_second": 18,
+    "transfer_range": 1.35,
+    "auto_request_ratio": 0.55,
+    "auto_stop_ratio": 0.90,
+    "auto_safe_enemy_range": 4.25,
+    "auto_standoff": 0.95,
+    "auto_think_seconds": 0.55,
+    "manual_override_seconds": 6.0
+  },
+  "ai": {
+    "think_seconds": 0.40,
+    "defensive_chase_range": 1.0,
+    "aggressive_chase_range": 4.0,
+    "retreat_hp_fraction": 0.22,
+    "recon_patrol_seconds": 3.5
+  },
+  "formation": {
+    "compact_spacing": 0.65,
+    "line_spacing": 1.0,
+    "spread_spacing": 1.5,
+    "default_frontage": 4
+  }
+}

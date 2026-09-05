@@ -3,14 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RTS AI — izometryczny prototyp 2D</title>
+  <title>RTS AI — tactical logic 0.3 + modular renderer</title>
   <link rel="stylesheet" href="./assets/ui/style.css" />
 </head>
 <body>
   <div id="app">
     <canvas id="game" aria-label="Pole bitwy"></canvas>
     <div id="topbar">
-      <strong>RTS AI // modular renderer 2D</strong><a href="./gallery.html" style="color:#a9d8eb">galeria 210 kombinacji</a>
+      <strong>RTS AI // tactical matrix 0.3</strong>
+      <a href="./gallery.html" style="color:#a9d8eb">galeria modułów</a>
+      <span id="mode-status">—</span>
       <span id="status">inicjalizacja…</span>
     </div>
     <aside id="hud">
@@ -18,9 +20,18 @@
       <div id="unit-stats" class="hud-body">LPM: wybór · PPM: ruch · kółko: zoom · WASD: kamera</div>
     </aside>
     <div id="legend">
-      <span><kbd>V</kbd> sensory</span><span><kbd>G</kbd> siatka</span><span><kbd>H</kbd> wysokość</span><span><kbd>F</kbd> FOW</span>
+      <span><kbd>Shift</kbd>+LPM grupa</span>
+      <span><kbd>G</kbd> attack ground</span>
+      <span><kbd>Z</kbd> formacja</span>
+      <span><kbd>1–4</kbd> postawa</span>
+      <span><kbd>L</kbd> auto-supply</span>
+      <span><kbd>N</kbd> dzień/noc</span>
+      <span><kbd>V</kbd> sensory</span>
+      <span><kbd>B</kbd> siatka</span>
+      <span><kbd>H</kbd> wysokość</span>
+      <span><kbd>F</kbd> FOW</span>
     </div>
-    <div id="loading">Ładowanie danych…</div>
+    <div id="loading">Ładowanie danych i logiki…</div>
   </div>
   <script type="module" src="./src/main.js"></script>
 </body>

@@ -68,6 +68,7 @@ export class IsoRenderer {
     ctx.setTransform(dpr,0,0,dpr,0,0); ctx.fillStyle='#172126'; ctx.fillRect(0,0,W,H);
     if(this.map) this._drawMap(ctx,W,H);
     this._drawObjects(ctx,W,H);
+    if(extra.effects) this._drawEffects(ctx,W,H,extra.effects);
     if(this.flags.fog && extra.fog) this._drawFog(ctx,W,H,extra.fog);
     if(this.flags.sensors) this._drawSensors(ctx,W,H);
     if(extra.commandMarker) this._drawCommandMarker(ctx,W,H,extra.commandMarker);
@@ -129,17 +130,61 @@ export class IsoRenderer {
   }
 
   _drawEntity(ctx,W,H,e){
+    const s=this._entityScreen(e,W,H),z=this.camera.zoom;
+
+    // Generic presentation modes. Their game meaning is decided by bindings, not renderer.
+    if(e.visibility==='contact'){
+      ctx.save();ctx.globalAlpha=.95*(e.opacity??1);
+      ctx.fillStyle='#ffd37b';ctx.beginPath();ctx.arc(s.x,s.y,5*z,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#fff0c7';ctx.font=`bold ${13*z}px system-ui`;ctx.textAlign='center';ctx.fillText('?',s.x,s.y-9*z);ctx.restore();
+      return;
+    }
+    if(e.visibility==='track'){
+      ctx.save();ctx.globalAlpha=.9*(e.opacity??1);ctx.strokeStyle='#ffd37b';ctx.lineWidth=2*z;
+      const r=8*z;ctx.beginPath();ctx.moveTo(s.x,s.y-r);ctx.lineTo(s.x+r,s.y);ctx.lineTo(s.x,s.y+r);ctx.lineTo(s.x-r,s.y);ctx.closePath();ctx.stroke();ctx.restore();
+      return;
+    }
+    if(e.visibility==='lastKnown'){
+      ctx.save();ctx.globalAlpha=.38;ctx.strokeStyle='#d9a567';ctx.lineWidth=2*z;const r=7*z;
+      ctx.beginPath();ctx.moveTo(s.x-r,s.y-r);ctx.lineTo(s.x+r,s.y+r);ctx.moveTo(s.x+r,s.y-r);ctx.lineTo(s.x-r,s.y+r);ctx.stroke();ctx.restore();
+      return;
+    }
+
     const a=this.assets.resolve(e.visual);if(!a)return;
-    const s=this._entityScreen(e,W,H),z=this.camera.zoom,w=(a.width??86)*z,h=(a.height??70)*z;
+    const w=(a.width??86)*z,h=(a.height??70)*z;
     const ax=(a.anchorX??(a.width??86)/2)*z, ay=(a.anchorY??(a.height??70))*z;
     const left=s.x-ax, top=s.y-ay;
-    ctx.save();if(e.visibility==='lastKnown')ctx.globalAlpha=.35;else if(e.visibility==='contact')ctx.globalAlpha=.58;
+    ctx.save();
+    ctx.globalAlpha=(e.visibility==='fireControl' ? .58 : 1)*(e.opacity??1);
     ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(s.x,s.y+3*z,Math.min(w*.32,44*z),9*z,0,0,Math.PI*2);ctx.fill();
-    if(e.spriteFilter)ctx.filter=e.spriteFilter;
+    if(e.visibility==='fireControl') ctx.filter='grayscale(1) brightness(.65)';
+    else if(e.spriteFilter)ctx.filter=e.spriteFilter;
     ctx.drawImage(a.image,left,top,w,h);ctx.filter='none';
     if(this.scene.selected.has(e.id)){ctx.strokeStyle='#e8f6ff';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(s.x,s.y,Math.min(w*.34,48*z),12*z,0,0,Math.PI*2);ctx.stroke();}
     this._drawIndicators(ctx,e,{x:s.x,y:s.y,left,top,width:w,height:h,zoom:z});
-    if(e.visibility==='contact'){ctx.fillStyle='#ffd37b';ctx.font=`bold ${13*z}px system-ui`;ctx.fillText('?',s.x+20*z,top+15*z);}ctx.restore();
+    ctx.restore();
+  }
+
+  _drawEffects(ctx,W,H,effects){
+    for(const e of effects){
+      if(!e||!e.kind)continue;
+      ctx.save();ctx.globalAlpha=e.alpha??1;ctx.strokeStyle=e.color??'#fff';ctx.fillStyle=e.color??'#fff';ctx.lineWidth=(e.width??2)*this.camera.zoom;
+      if(e.dashed)ctx.setLineDash([5*this.camera.zoom,5*this.camera.zoom]);
+      if(e.kind==='line'){
+        const a=this._worldPointScreen(e.from,W,H),b=this._worldPointScreen(e.to,W,H);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+        if(e.endDot){ctx.setLineDash([]);ctx.beginPath();ctx.arc(b.x,b.y,e.endDot*this.camera.zoom,0,Math.PI*2);ctx.fill();}
+      }else if(e.kind==='projectile'){
+        const t=Math.max(0,Math.min(1,e.progress??0)),x=(e.from.x+(e.to.x-e.from.x)*t),y=(e.from.y+(e.to.y-e.from.y)*t),z=(e.from.z??0)+((e.to.z??0)-(e.from.z??0))*t+Math.sin(Math.PI*t)*1.3;
+        const p=this._worldPointScreen({x,y,z},W,H);ctx.beginPath();ctx.arc(p.x,p.y,(e.radius??4)*this.camera.zoom,0,Math.PI*2);ctx.fill();
+      }else if(e.kind==='ring'){
+        const p=this._worldPointScreen(e.at,W,H),radius=(e.radius??1)*(e.progress??1),rx=radius*this.iso.tileW*.5*this.camera.zoom,ry=radius*this.iso.tileH*.5*this.camera.zoom;ctx.beginPath();ctx.ellipse(p.x,p.y,rx,ry,0,0,Math.PI*2);ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  _worldPointScreen(p,W,H){
+    const iso=this.iso.worldToIso(p.x,p.y,p.z??0);return this.camera.worldScreenToCanvas(iso,W,H);
   }
 
   _drawIndicators(ctx,e,box){
