@@ -39,25 +39,25 @@ function showSelection(){
   const units=sim.getSelectedUnits();
   if(!units.length){
     nameEl.textContent='Brak zaznaczenia';
-    statsEl.textContent='LPM: wybór · przeciągnij LPM: prostokąt wyboru · Shift: dodaj/usuń\n2×LPM: ten sam loadout na ekranie · PPM: kontekst (jednostka ma precedens nad mapą)\nAlt+LPM lub środkowy: kamera · G: attack ground';
+    statsEl.textContent='LPM: wybór · przeciągnij LPM: prostokąt wyboru · Shift: dodaj/usuń\n2×LPM: ten sam loadout na ekranie · PPM: kontekst (jednostka ma precedens nad mapą)\nSpacja: pauza · F9: DEBUG kontrola wroga · G: attack ground';
     return;
   }
   if(units.length>1){
     const hp=units.reduce((s,u)=>s+u.hp,0),maxHp=units.reduce((s,u)=>s+u.maxHp,0);
     const ammo=units.reduce((s,u)=>s+u.supplyState,0),maxAmmo=units.reduce((s,u)=>s+u.supplyCapacity,0);
-    nameEl.textContent=`Grupa: ${units.length} jednostek`;
+    nameEl.textContent=`Grupa ${units[0].faction}: ${units.length} jednostek`;
     statsEl.textContent=`HP ${Math.round(hp)} / ${Math.round(maxHp)}\nAmunicja ${Math.round(ammo)} / ${Math.round(maxAmmo)}\nFormacja: ${sim.formation}\nPostawa rozkazowa: ${sim.stance}`;
     return;
   }
   const u=units[0],ammoPct=u.supplyCapacity>0?Math.round((u.supplyState/u.supplyCapacity)*100):0;
-  statsEl.textContent=`${u.assembly.platform}\n+ ${u.assembly.weapon}\n+ ${u.assembly.specialization}\n\nHP ${Math.round(u.hp)} / ${Math.round(u.maxHp)}\nSupresja ${Math.round(u.suppression)} / ${u.maxSuppression}\nAmunicja ${ammoPips(u)}  ${Math.round(u.supplyState)} / ${Math.round(u.supplyCapacity)} (${ammoPct}%)\nRuch ${u.speed.toFixed(2)} pola/s\nBroń: range ${u.minRange??0}–${u.weaponRange} · splash ${Number(u.splashRadius??0).toFixed(2)}\nEyes ${sim.getVisualRange(u).toFixed(1)} · sensor ${u.sensorRange.toFixed(1)}\nPostawa: ${u.stance}${u.configuration==='tracked_supply_carrier'?`\nAuto supply: ${u.autoSupply?'ON':'OFF'}`:''}\nRola: ${u.role}`;
-  nameEl.textContent=u.label;
+  statsEl.textContent=`${u.assembly.platform}\n+ ${u.assembly.weapon}\n+ ${u.assembly.specialization}\n\nHP ${Math.round(u.hp)} / ${Math.round(u.maxHp)}\nSupresja ${Math.round(u.suppression)} / ${u.maxSuppression}\nAmunicja ${ammoPips(u)}  ${Math.round(u.supplyState)} / ${Math.round(u.supplyCapacity)} (${ammoPct}%)\nRuch ${u.speed.toFixed(2)} pola/s\nBroń: range ${u.minRange??0}–${u.weaponRange} · splash ${Number(u.splashRadius??0).toFixed(2)}\nEyes ${sim.getVisualRange(u).toFixed(1)} · sensor ${u.sensorRange.toFixed(1)}\nPostawa: ${u.stance} · Rozkaz: ${u.orderKind}${u.configuration==='tracked_supply_carrier'?`\nAuto supply: ${u.autoSupply?'ON':'OFF'}`:''}\nRola: ${u.role}`;
+  nameEl.textContent=`${u.label} [${u.faction}]`;
 }
 
 function updateMode(){
   const ui=sim.getUiState();
-  modeEl.textContent=`${ui.attackGroundMode?'ATTACK GROUND · ':''}${ui.formation} · ${ui.stance} · visibility ${ui.visibility.toFixed(2)}`;
-  modeEl.classList.toggle('warning',ui.attackGroundMode);
+  modeEl.textContent=`${ui.paused?'PAUZA · ':''}${ui.debugEnemyControl?'DEBUG ENEMY CONTROL · ':''}${ui.attackGroundMode?'ATTACK GROUND · ':''}${ui.formation} · ${ui.stance} · ${ui.selectedFaction??'—'} · visibility ${ui.visibility.toFixed(2)}`;
+  modeEl.classList.toggle('warning',ui.attackGroundMode||ui.paused||ui.debugEnemyControl);
 }
 
 function commandFeedback(result){
@@ -98,6 +98,8 @@ const input=new Input(canvas,renderer.camera,{
     if(e.repeat)return;
     const presentationFlags={KeyV:'sensors',KeyB:'grid',KeyH:'heights',KeyF:'fog'};
     if(presentationFlags[e.code]){view.toggleFlag(presentationFlags[e.code]);return;}
+    if(e.code==='Space'){e.preventDefault();sim.togglePause();updateMode();showSelection();return;}
+    if(e.code==='F9'){e.preventDefault();sim.toggleDebugEnemyControl();updateMode();showSelection();status.textContent=sim.getUiState().debugEnemyControl?'DEBUG: wrogie jednostki ujawnione i sterowalne':'DEBUG enemy control OFF';return;}
     if(e.code==='KeyG'){sim.toggleAttackGround();updateMode();return;}
     if(e.code==='KeyZ'){sim.cycleFormation();showSelection();updateMode();return;}
     if(e.code==='Digit1'){sim.setStance('aggressive');showSelection();updateMode();return;}
@@ -119,7 +121,7 @@ function loop(now){
   view.render({...framePresenter.present(sim.getFrame()),selectionBox:input.getSelectionBox()});
   hudClock+=dt;if(hudClock>.18){hudClock=0;showSelection();updateMode();}
   if(!status.textContent.includes('brak stabilnego')&&!status.textContent.startsWith('attack ground')&&!status.textContent.startsWith('atak:')){
-    status.textContent=`game logic 0.4 · sprite hit-test · box select · ${renderer.assets.composer.cache.size} loadouts cached`;
+    status.textContent=`game logic 0.5 · order state machine · sprite hit-test · ${renderer.assets.composer.cache.size} loadouts cached`;
   }
   requestAnimationFrame(loop);
 }

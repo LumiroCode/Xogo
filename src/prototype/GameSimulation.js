@@ -26,6 +26,8 @@ export class GameSimulation {
     this.selected=[];
     this.commandMarker=null;
     this.attackGroundMode=false;
+    this.paused=false;
+    this.debugEnemyControl=false;
     this.formation='compact';
     this.stance='defensive';
     this.time=0;
@@ -73,6 +75,8 @@ export class GameSimulation {
       stance:instance.stance ?? (resolved.weaponRange>0?'defensive':'passive'),
       formation:instance.formation ?? 'compact',
       path:[],moveGoal:null,manualTarget:null,autoTarget:null,groundTarget:null,
+      orderKind:'idle',attackLastKnown:null,attackRepathAt:0,attackPathTarget:null,
+      autoChasing:false,returningToAnchor:false,
       fireCooldown:Math.random()*.35,recentFire:0,alive:true,
       defensiveAnchor:{x:instance.x,y:instance.y},
       autoSupply:instance.autoSupply ?? (instance.configuration==='tracked_supply_carrier'),
@@ -85,13 +89,20 @@ export class GameSimulation {
     return state;
   }
 
+  _canDebugControl(u){return !!(u?.alive&&(u.faction==='human'||(this.debugEnemyControl&&u.faction==='machine')));}
+  getSelectedFaction(){return this.getSelectedUnits()[0]?.faction??null;}
+
+  _prepareSelectionFaction(faction,additive){
+    const current=this.getSelectedFaction();
+    if(!additive||!current||current!==faction)this.selected=[];
+  }
+
   selectAt(cx,cy,additive=false){
-    const e=this.view.pick(cx,cy);
-    const u=e?.selectable ? this.units.get(e.id) : null;
-    if(u?.alive && u.faction==='human'){
-      if(!additive)this.selected=[];
-      if(additive && this.selected.includes(e.id))this.selected=this.selected.filter(id=>id!==e.id);
-      else if(!this.selected.includes(e.id))this.selected.push(e.id);
+    const e=this.view.pick(cx,cy),u=e?this.units.get(e.id):null;
+    if(this._canDebugControl(u)){
+      this._prepareSelectionFaction(u.faction,additive);
+      if(additive&&this.selected.includes(u.id))this.selected=this.selected.filter(id=>id!==u.id);
+      else if(!this.selected.includes(u.id))this.selected.push(u.id);
       this.view.setSelection(this.selected);
       return u;
     }
@@ -100,20 +111,28 @@ export class GameSimulation {
   }
 
   selectRect(rect,additive=false){
-    const hits=this.view.pickRect(rect,{selectableOnly:true});
-    const ids=hits.map(e=>e.id).filter(id=>{const u=this.units.get(id);return u?.alive&&u.faction==='human';});
-    if(!additive)this.selected=[];
-    for(const id of ids)if(!this.selected.includes(id))this.selected.push(id);
+    const hits=this.view.pickRect(rect,{selectableOnly:!this.debugEnemyControl});
+    let units=hits.map(e=>this.units.get(e.id)).filter(u=>this._canDebugControl(u));
+    const current=this.getSelectedFaction();
+    let faction=(additive&&current)?current:null;
+    if(!faction){
+      // Normal human control keeps precedence when a debug box covers both armies.
+      faction=units.some(u=>u.faction==='human')?'human':units[0]?.faction??null;
+    }
+    if(!faction){if(!additive){this.selected=[];this.view.setSelection([]);}return[];}
+    units=units.filter(u=>u.faction===faction);
+    this._prepareSelectionFaction(faction,additive);
+    for(const u of units)if(!this.selected.includes(u.id))this.selected.push(u.id);
     this.view.setSelection(this.selected);
     return this.getSelectedUnits();
   }
 
   selectSameConfigurationAt(cx,cy,additive=false){
-    const e=this.view.pick(cx,cy),clicked=e?.selectable?this.units.get(e.id):null;
-    if(!clicked?.alive||clicked.faction!=='human')return null;
-    const onScreen=new Set(this.view.entityIdsOnScreen({selectableOnly:true}));
-    const ids=[...this.units.values()].filter(u=>u.alive&&u.faction==='human'&&u.configuration===clicked.configuration&&onScreen.has(u.id)).map(u=>u.id);
-    if(!additive)this.selected=[];
+    const e=this.view.pick(cx,cy),clicked=e?this.units.get(e.id):null;
+    if(!this._canDebugControl(clicked))return null;
+    const onScreen=new Set(this.view.entityIdsOnScreen({selectableOnly:!this.debugEnemyControl}));
+    const ids=[...this.units.values()].filter(u=>u.alive&&u.faction===clicked.faction&&u.configuration===clicked.configuration&&onScreen.has(u.id)).map(u=>u.id);
+    this._prepareSelectionFaction(clicked.faction,additive);
     for(const id of ids)if(!this.selected.includes(id))this.selected.push(id);
     this.view.setSelection(this.selected);
     return this.getSelectedUnits();
@@ -125,42 +144,38 @@ export class GameSimulation {
 
   commandContext(cx,cy){
     if(!this.selected.length)return {kind:'none'};
+    const selected=this.getSelectedUnits(),controllerFaction=this.getSelectedFaction();
+    if(!controllerFaction)return {kind:'none'};
 
-    // Explicit modal command is the only deliberate exception to entity precedence:
-    // attack-ground asks for a map point by definition, even when a sprite is under the cursor.
     if(this.attackGroundMode){
       const world=this.view.screenToWorld(cx,cy);
       const x=clamp(world.x,.05,this.map.width-.05),y=clamp(world.y,.05,this.map.height-.05);
       let count=0;
-      for(const u of this.getSelectedUnits())if(u.rateOfFire>0){
-        u.groundTarget={x,y};u.manualTarget=null;u.autoTarget=null;u.path=[];u.moveGoal=null;count++;
+      for(const u of selected)if(u.rateOfFire>0){
+        u.groundTarget={x,y};u.manualTarget=null;u.autoTarget=null;u.path=[];u.moveGoal=null;u.orderKind='attack_ground';count++;
       }
       this.commandMarker={x,y,time:performance.now(),kind:'attack_ground'};
       this.attackGroundMode=false;
       return {kind:'attack_ground',count,x,y};
     }
 
-    // Default contextual command: presentation entity first, map only when no entity was hit.
-    const picked=this.view.pick(cx,cy);
-    const target=picked?this.units.get(picked.id):null;
+    const picked=this.view.pick(cx,cy),target=picked?this.units.get(picked.id):null;
     if(target?.alive){
-      if(target.faction!=='human'){
-        const intel=this._intelFor('human',target);
+      if(target.faction!==controllerFaction){
+        const intel=this._intelFor(controllerFaction,target);
+        // Debug control reveals enemy sprites for inspection, but orders still obey the
+        // controlling faction's actual information state.
         if(intel.level==='contact'||intel.level==='unknown')return {kind:'insufficient_intel',level:intel.level,target};
-        for(const u of this.getSelectedUnits()){
-          u.manualTarget=target.id;u.autoTarget=null;u.groundTarget=null;u.path=[];u.moveGoal=null;
-        }
+        for(const u of selected)this._issueAttackTarget(u,target);
         this.commandMarker={x:target.x,y:target.y,time:performance.now(),kind:'attack'};
         return {kind:'attack',target};
       }
-      // Friendly sprite consumed the interaction. A future contextual action (follow/repair/etc.)
-      // can live here without ever falling through to an accidental map move.
       return {kind:'friendly_entity',target};
     }
 
     const world=this.view.screenToWorld(cx,cy);
     const x=clamp(world.x,.05,this.map.width-.05),y=clamp(world.y,.05,this.map.height-.05);
-    this._issueFormationMove(this.getSelectedUnits(),x,y,true);
+    this._issueFormationMove(selected,x,y,true);
     this.commandMarker={x,y,time:performance.now(),kind:'move'};
     return {kind:'move',x,y};
   }
@@ -169,7 +184,7 @@ export class GameSimulation {
     this.stance=stance;
     for(const u of this.getSelectedUnits()){
       u.stance=stance;
-      if(stance==='concealed'){u.emission=false;u.manualTarget=null;u.autoTarget=null;}
+      if(stance==='concealed')u.emission=false;
     }
     return stance;
   }
@@ -182,6 +197,13 @@ export class GameSimulation {
   }
 
   toggleAttackGround(){this.attackGroundMode=!this.attackGroundMode;return this.attackGroundMode;}
+  togglePause(){this.paused=!this.paused;return this.paused;}
+  toggleDebugEnemyControl(){
+    this.debugEnemyControl=!this.debugEnemyControl;
+    if(!this.debugEnemyControl&&this.getSelectedFaction()==='machine'){this.selected=[];this.view.setSelection([]);}
+    this._publishViews(true);
+    return this.debugEnemyControl;
+  }
   toggleEmission(){for(const u of this.getSelectedUnits())u.emission=!u.emission;}
   toggleAutoSupply(){
     const carriers=this.getSelectedUnits().filter(u=>u.configuration==='tracked_supply_carrier');
@@ -190,7 +212,7 @@ export class GameSimulation {
     for(const u of carriers){u.autoSupply=next;u.autoSupplyTarget=null;}
     return next;
   }
-  stopSelected(){for(const u of this.getSelectedUnits()){u.path=[];u.moveGoal=null;u.manualTarget=null;u.autoTarget=null;u.groundTarget=null;}}
+  stopSelected(){for(const u of this.getSelectedUnits()){this._clearExplicitCombatOrder(u);u.path=[];u.moveGoal=null;u.autoTarget=null;u.autoChasing=false;u.returningToAnchor=false;u.orderKind='idle';}}
   toggleNight(){
     const day=this.rules.battlefield.visibility;
     const night=this.rules.battlefield.night_visibility;
@@ -204,11 +226,15 @@ export class GameSimulation {
       formation:this.formation,
       stance:this.stance,
       visibility:this.battlefieldVisibility,
+      paused:this.paused,
+      debugEnemyControl:this.debugEnemyControl,
+      selectedFaction:this.getSelectedFaction(),
       selected:this.getSelectedUnits()
     };
   }
 
   update(dt){
+    if(this.paused)return;
     this.time+=dt;
     this._updateIntel();
     this._updateAutoSupply();
@@ -295,10 +321,44 @@ export class GameSimulation {
     return [];
   }
 
-  _issueMove(u,x,y,manual=true){
-    u.moveGoal={x,y};u.path=this._findPath(u,x,y);u.manualTarget=null;u.groundTarget=null;
+  _clearExplicitCombatOrder(u){
+    u.manualTarget=null;u.groundTarget=null;u.attackLastKnown=null;u.attackPathTarget=null;u.attackRepathAt=0;
+  }
+
+  _issueMove(u,x,y,manual=true,preserveCombatOrder=false,orderKind=null){
+    u.moveGoal={x,y};u.path=this._findPath(u,x,y);
+    if(!preserveCombatOrder)this._clearExplicitCombatOrder(u);
+    if(orderKind)u.orderKind=orderKind;
+    else if(manual)u.orderKind='move';
     if(manual && u.configuration==='tracked_supply_carrier')u.manualMoveUntil=this.time+this.rules.supply.manual_override_seconds;
   }
+
+  _issueAttackTarget(u,target){
+    u.manualTarget=target.id;u.autoTarget=null;u.groundTarget=null;u.path=[];u.moveGoal=null;
+    u.orderKind='attack_target';u.attackLastKnown={x:target.x,y:target.y,time:this.time};
+    u.attackPathTarget=null;u.attackRepathAt=0;u.autoChasing=false;u.returningToAnchor=false;
+  }
+
+  _knownTargetPoint(observerFaction,target){
+    const intel=this._intelFor(observerFaction,target);
+    if(['track','fire_control','identified'].includes(intel.level))return {x:target.x,y:target.y,level:intel.level};
+    const m=this.memory[observerFaction].get(target.id);
+    return m?{x:m.x,y:m.y,level:m.level??'last_known'}:null;
+  }
+
+  _attackStopRange(u){
+    return Math.max(u.minRange??0,Math.max(0,u.weaponRange-(this.rules.combat.attack_stop_hysteresis??.2)));
+  }
+
+  _navigateAttack(u,point,orderKind='attack_target'){
+    const c=this.rules.combat,old=u.attackPathTarget;
+    const moved=!old||Math.hypot(point.x-old.x,point.y-old.y)>c.attack_repath_distance;
+    if(!u.path.length||this.time>=u.attackRepathAt||moved){
+      this._issueMove(u,point.x,point.y,false,true,orderKind);
+      u.attackPathTarget={x:point.x,y:point.y};u.attackRepathAt=this.time+c.attack_repath_seconds;
+    }
+  }
+
 
   _issueFormationMove(units,gx,gy,manual=true){
     if(!units.length)return;
@@ -324,7 +384,15 @@ export class GameSimulation {
   _updateMovement(u,dt){
     if(!u.path.length)return;
     const p=u.path[0],dx=p.x-u.x,dy=p.y-u.y,d=Math.hypot(dx,dy);
-    if(d<.05){u.path.shift();if(!u.path.length)u.moveGoal=null;return;}
+    if(d<.05){
+      u.path.shift();
+      if(!u.path.length){
+        u.moveGoal=null;
+        if(u.orderKind==='move'){u.defensiveAnchor={x:u.x,y:u.y};u.orderKind='idle';}
+        if(u.returningToAnchor){u.returningToAnchor=false;u.orderKind='idle';}
+      }
+      return;
+    }
     const tile=this.tileAt(u.x,u.y),next=this.tileAt(p.x,p.y);
     const supMove=1-(u.suppression/u.maxSuppression)*this.rules.combat.suppression_move_penalty;
     const speed=u.speed*this._moveMultiplier(u,next,tile)*supMove;
@@ -448,7 +516,11 @@ export class GameSimulation {
       const mem=this.memory[faction];
       for(const target of this.units.values())if(target.alive&&target.faction!==faction){
         const intel=this._computeIntel(faction,target);map.set(target.id,intel);
-        if(intel.level!=='unknown')mem.set(target.id,{...intel,x:target.x,y:target.y,time:this.time});
+        if(intel.level!=='unknown'){
+          const mx=intel.level==='contact'?Math.floor(target.x)+.5:target.x;
+          const my=intel.level==='contact'?Math.floor(target.y)+.5:target.y;
+          mem.set(target.id,{...intel,x:mx,y:my,time:this.time});
+        }
       }
       for(const [id,m] of [...mem])if(this.time-m.time>this.rules.sensors.memory_seconds)mem.delete(id);
     }
@@ -469,7 +541,7 @@ export class GameSimulation {
   }
 
   _humanDisplayState(u){
-    if(u.faction==='human')return {level:'identified',x:u.x,y:u.y};
+    if(u.faction==='human'||(this.debugEnemyControl&&u.faction==='machine'))return {level:'identified',x:u.x,y:u.y};
     const intel=this._intelFor('human',u);
     if(intel.level!=='unknown')return {level:intel.level,x:intel.level==='contact'?Math.floor(u.x)+.5:u.x,y:intel.level==='contact'?Math.floor(u.y)+.5:u.y};
     const m=this.memory.human.get(u.id);
@@ -571,14 +643,76 @@ export class GameSimulation {
   }
 
   _updateCombat(u,dt){
-    u.fireCooldown=Math.max(0,u.fireCooldown-dt);u.recentFire=Math.max(0,u.recentFire-dt);u.suppression=Math.max(0,u.suppression-this.rules.combat.suppression_decay_per_second*dt);
+    const c=this.rules.combat;
+    u.fireCooldown=Math.max(0,u.fireCooldown-dt);u.recentFire=Math.max(0,u.recentFire-dt);u.suppression=Math.max(0,u.suppression-c.suppression_decay_per_second*dt);
+
     if(u.groundTarget){if(u.fireCooldown<=0)this._fireGround(u,u.groundTarget.x,u.groundTarget.y);return;}
-    let target=u.manualTarget?this.units.get(u.manualTarget):null;if(target&&!target.alive){u.manualTarget=null;target=null;}
-    if(!target){target=this._selectAutoTarget(u);u.autoTarget=target?.id??null;}
-    if(!target)return;
-    const d=dist(u,target);
-    if(d<=u.weaponRange&&d>=(u.minRange??0)&&u.fireCooldown<=0)this._fireAt(u,target);
-    else if(u.stance==='aggressive'&&d<=u.weaponRange+this.rules.ai.aggressive_chase_range&&!u.moveGoal)this._issueMove(u,target.x,target.y,false);
+
+    // Explicit Attack Target is a hard player/AI intent and overrides stance.
+    // Stance governs autonomous target acquisition only.
+    if(u.manualTarget){
+      const target=this.units.get(u.manualTarget);
+      if(!target?.alive){this._clearExplicitCombatOrder(u);u.path=[];u.moveGoal=null;u.orderKind='idle';return;}
+      const known=this._knownTargetPoint(u.faction,target);
+      if(!known){this._clearExplicitCombatOrder(u);u.path=[];u.moveGoal=null;u.orderKind='idle';return;}
+      if(['track','fire_control','identified'].includes(known.level))u.attackLastKnown={x:known.x,y:known.y,time:this.time};
+
+      const hasTrack=['track','fire_control','identified'].includes(known.level);
+      if(!hasTrack){
+        const p=u.attackLastKnown??known,dKnown=Math.hypot(u.x-p.x,u.y-p.y);
+        if(dKnown<=c.attack_last_known_arrival){
+          this._clearExplicitCombatOrder(u);u.path=[];u.moveGoal=null;u.orderKind='idle';return;
+        }
+        this._navigateAttack(u,p);return;
+      }
+
+      const d=dist(u,target),minR=u.minRange??0,stopR=this._attackStopRange(u);
+      if(d<minR){
+        // No automatic kiting: minimum range is an intentional vulnerability.
+        u.path=[];u.moveGoal=null;
+        return;
+      }
+      if(d>u.weaponRange){this._navigateAttack(u,known);return;}
+      if(d>stopR){
+        // Enter the range band, then continue a little further before stopping.
+        // This 0.2-tile hysteresis prevents move/fire oscillation at the exact boundary.
+        this._navigateAttack(u,known);return;
+      }
+
+      u.path=[];u.moveGoal=null;u.attackPathTarget=null;
+      if(u.fireCooldown<=0)this._fireAt(u,target);
+      return;
+    }
+
+    let target=this._selectAutoTarget(u);u.autoTarget=target?.id??null;
+    if(target){
+      const d=dist(u,target),minR=u.minRange??0,stopR=this._attackStopRange(u);
+      if(d>=minR&&d<=u.weaponRange){
+        // Autonomous fire does not cancel an explicit Move destination.
+        if(u.fireCooldown<=0)this._fireAt(u,target);
+        return;
+      }
+      const autonomousPathFree=!u.moveGoal||u.orderKind==='auto_chase';
+      if(autonomousPathFree&&d>u.weaponRange){
+        if(u.stance==='aggressive'){
+          this._navigateAttack(u,{x:target.x,y:target.y},'auto_chase');u.autoChasing=true;
+        }else if(u.stance==='defensive'){
+          const anchor=u.defensiveAnchor??{x:u.x,y:u.y};
+          const maxFromAnchor=u.weaponRange+this.rules.ai.defensive_chase_range;
+          if(Math.hypot(target.x-anchor.x,target.y-anchor.y)<=maxFromAnchor){
+            this._navigateAttack(u,{x:target.x,y:target.y},'auto_chase');u.autoChasing=true;
+          }
+        }
+      }
+      return;
+    }
+
+    // AoE/C&C-style defensive leash: after an autonomous defensive chase, return.
+    if(u.autoChasing&&u.stance==='defensive'&&!u.moveGoal){
+      u.autoChasing=false;
+      const a=u.defensiveAnchor??{x:u.x,y:u.y};
+      if(Math.hypot(u.x-a.x,u.y-a.y)>.12){u.returningToAnchor=true;this._issueMove(u,a.x,a.y,false,true,'return_anchor');}
+    }
   }
 
   _kill(u){u.alive=false;this.selected=this.selected.filter(id=>id!==u.id);this.view.removeEntity(u.id);this.view.setSelection(this.selected);for(const faction of ['human','machine']){this.intel[faction].delete(u.id);this.memory[faction].delete(u.id);}}
@@ -625,15 +759,18 @@ export class GameSimulation {
     const r=this.rules.ai;if(this.time-this.lastAiThink<r.think_seconds)return;this.lastAiThink=this.time;
     for(const u of this.units.values())if(u.alive&&u.faction==='machine'){
       if(u.hp/u.maxHp<r.retreat_hp_fraction&&u.stance!=='passive'){
-        u.stance='passive';const dx=u.x-this.map.width*.5,dy=u.y-this.map.height*.5,d=Math.hypot(dx,dy)||1;if(!u.path.length)this._issueMove(u,clamp(u.x+dx/d*3,.5,this.map.width-.5),clamp(u.y+dy/d*3,.5,this.map.height-.5),false);continue;
+        u.stance='passive';this._clearExplicitCombatOrder(u);u.autoTarget=null;
+        const dx=u.x-this.map.width*.5,dy=u.y-this.map.height*.5,d=Math.hypot(dx,dy)||1;
+        if(!u.path.length)this._issueMove(u,clamp(u.x+dx/d*3,.5,this.map.width-.5),clamp(u.y+dy/d*3,.5,this.map.height-.5),false,false,'retreat');
+        continue;
       }
-      if(u.configuration==='recon_drone'&&this.time>=u.nextReconPatrol&&!u.path.length){
-        u.nextReconPatrol=this.time+r.recon_patrol_seconds;this._issueMove(u,clamp(this.map.width*.5+(Math.random()-.5)*8,.5,this.map.width-.5),clamp(this.map.height*.5+(Math.random()-.5)*8,.5,this.map.height-.5),false);
+      if(u.configuration==='recon_drone'&&this.time>=u.nextReconPatrol&&!u.path.length&&!u.manualTarget){
+        u.nextReconPatrol=this.time+r.recon_patrol_seconds;
+        this._issueMove(u,clamp(this.map.width*.5+(Math.random()-.5)*8,.5,this.map.width-.5),clamp(this.map.height*.5+(Math.random()-.5)*8,.5,this.map.height-.5),false,false,'recon_patrol');
       }
-      const t=this._selectAutoTarget(u);
-      if(t&&u.stance==='aggressive'&&dist(u,t)>u.weaponRange*.85&&!u.path.length)this._issueMove(u,t.x,t.y,false);
-      else if(!t&&u.stance==='aggressive'&&!u.path.length){
-        const memories=[...this.memory.machine.values()].sort((a,b)=>b.time-a.time);const m=memories[0];if(m)this._issueMove(u,m.x,m.y,false);
+      if(u.stance==='aggressive'&&!u.manualTarget&&!u.path.length&&!this._selectAutoTarget(u)){
+        const memories=[...this.memory.machine.values()].sort((a,b)=>b.time-a.time),m=memories[0];
+        if(m)this._issueMove(u,m.x,m.y,false,false,'search');
       }
     }
   }
