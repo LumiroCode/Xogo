@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.4-mvp",
+  "schema_version": "0.6-units",
   "units": {
     "height": "abstract height units",
     "footprint": "abstract ground-area units",
@@ -120,7 +120,11 @@
       "rateOfFire": 1.5,
       "minRange": 0,
       "indirectFire": false,
-      "splashRadius": 0
+      "splashRadius": 0,
+      "targetingModes": [
+        "unit",
+        "ground"
+      ]
     },
     "rifle": {
       "weaponRange": 6,
@@ -130,7 +134,11 @@
       "rateOfFire": 1.0,
       "minRange": 0,
       "indirectFire": false,
-      "splashRadius": 0
+      "splashRadius": 0,
+      "targetingModes": [
+        "unit",
+        "ground"
+      ]
     },
     "machine_gun": {
       "weaponRange": 6,
@@ -140,7 +148,11 @@
       "rateOfFire": 4.0,
       "minRange": 0,
       "indirectFire": false,
-      "splashRadius": 0
+      "splashRadius": 0,
+      "targetingModes": [
+        "unit",
+        "ground"
+      ]
     },
     "autocannon": {
       "weaponRange": 8,
@@ -150,7 +162,11 @@
       "rateOfFire": 2.0,
       "minRange": 0,
       "indirectFire": false,
-      "splashRadius": 0
+      "splashRadius": 0,
+      "targetingModes": [
+        "unit",
+        "ground"
+      ]
     },
     "heavy_cannon": {
       "weaponRange": 10,
@@ -160,7 +176,11 @@
       "rateOfFire": 0.4,
       "minRange": 0,
       "indirectFire": false,
-      "splashRadius": 0
+      "splashRadius": 0,
+      "targetingModes": [
+        "unit",
+        "ground"
+      ]
     },
     "none": {
       "weaponRange": 0,
@@ -170,7 +190,11 @@
       "rateOfFire": 0.0,
       "minRange": 0,
       "indirectFire": false,
-      "splashRadius": 0
+      "splashRadius": 0,
+      "targetingModes": [
+        "unit",
+        "ground"
+      ]
     },
     "artillery": {
       "weaponRange": 14,
@@ -180,7 +204,11 @@
       "suppressionPower": 68,
       "rateOfFire": 0.18,
       "indirectFire": true,
-      "splashRadius": 1.15
+      "splashRadius": 1.15,
+      "targetingModes": [
+        "unit",
+        "ground"
+      ]
     }
   },
   "specializations": {

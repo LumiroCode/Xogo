@@ -121,7 +121,7 @@ function loop(now){
   view.render({...framePresenter.present(sim.getFrame()),selectionBox:input.getSelectionBox()});
   hudClock+=dt;if(hudClock>.18){hudClock=0;showSelection();updateMode();}
   if(!status.textContent.includes('brak stabilnego')&&!status.textContent.startsWith('attack ground')&&!status.textContent.startsWith('atak:')){
-    status.textContent=`game logic 0.5 · order state machine · sprite hit-test · ${renderer.assets.composer.cache.size} loadouts cached`;
+    status.textContent=`game logic 0.6 · unified attack state machine · sprite hit-test · ${renderer.assets.composer.cache.size} loadouts cached`;
   }
   requestAnimationFrame(loop);
 }

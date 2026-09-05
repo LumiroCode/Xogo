@@ -75,7 +75,7 @@ export class GameSimulation {
       stance:instance.stance ?? (resolved.weaponRange>0?'defensive':'passive'),
       formation:instance.formation ?? 'compact',
       path:[],moveGoal:null,manualTarget:null,autoTarget:null,groundTarget:null,
-      orderKind:'idle',attackLastKnown:null,attackRepathAt:0,attackPathTarget:null,
+      orderKind:'idle',attackLastKnown:null,attackRepathAt:0,attackPathTarget:null,attackHolding:false,
       autoChasing:false,returningToAnchor:false,
       fireCooldown:Math.random()*.35,recentFire:0,alive:true,
       defensiveAnchor:{x:instance.x,y:instance.y},
@@ -166,9 +166,10 @@ export class GameSimulation {
         // Debug control reveals enemy sprites for inspection, but orders still obey the
         // controlling faction's actual information state.
         if(intel.level==='contact'||intel.level==='unknown')return {kind:'insufficient_intel',level:intel.level,target};
-        for(const u of selected)this._issueAttackTarget(u,target);
+        let count=0;
+        for(const u of selected)if(u.rateOfFire>0){this._issueAttackTarget(u,target);count++;}
         this.commandMarker={x:target.x,y:target.y,time:performance.now(),kind:'attack'};
-        return {kind:'attack',target};
+        return {kind:'attack',target,count};
       }
       return {kind:'friendly_entity',target};
     }
@@ -322,12 +323,13 @@ export class GameSimulation {
   }
 
   _clearExplicitCombatOrder(u){
-    u.manualTarget=null;u.groundTarget=null;u.attackLastKnown=null;u.attackPathTarget=null;u.attackRepathAt=0;
+    u.manualTarget=null;u.groundTarget=null;u.attackLastKnown=null;u.attackPathTarget=null;u.attackRepathAt=0;u.attackHolding=false;
   }
 
   _issueMove(u,x,y,manual=true,preserveCombatOrder=false,orderKind=null){
     u.moveGoal={x,y};u.path=this._findPath(u,x,y);
     if(!preserveCombatOrder)this._clearExplicitCombatOrder(u);
+    if(!preserveCombatOrder)u.attackHolding=false;
     if(orderKind)u.orderKind=orderKind;
     else if(manual)u.orderKind='move';
     if(manual && u.configuration==='tracked_supply_carrier')u.manualMoveUntil=this.time+this.rules.supply.manual_override_seconds;
@@ -336,7 +338,7 @@ export class GameSimulation {
   _issueAttackTarget(u,target){
     u.manualTarget=target.id;u.autoTarget=null;u.groundTarget=null;u.path=[];u.moveGoal=null;
     u.orderKind='attack_target';u.attackLastKnown={x:target.x,y:target.y,time:this.time};
-    u.attackPathTarget=null;u.attackRepathAt=0;u.autoChasing=false;u.returningToAnchor=false;
+    u.attackPathTarget=null;u.attackRepathAt=0;u.attackHolding=false;u.autoChasing=false;u.returningToAnchor=false;
   }
 
   _knownTargetPoint(observerFaction,target){
@@ -572,20 +574,24 @@ export class GameSimulation {
   _fireAt(u,target){
     if(!u.alive||!target?.alive||u.supplyState<1||u.rateOfFire<=0)return false;
     const d=dist(u,target),minR=u.minRange??0;if(d>u.weaponRange||d<minR)return false;
-    const obs=this._observation(u,target),s=this.rules.sensors;if(obs.q<s.track_threshold)return false;
+    const intel=this._intelFor(u.faction,target),s=this.rules.sensors;
+    if(!['track','fire_control','identified'].includes(intel.level))return false;
+    const q=clamp(intel.q??0,0,1);
+    // Direct-fire weapons still need the shooter's geometric LoS. Indirect weapons
+    // can consume a firing solution supplied by another friendly observer.
     if(!u.indirectFire&&!this._lineOfSight(u,target))return false;
 
     u.supplyState=Math.max(0,u.supplyState-1);u.fireCooldown=1/Math.max(.01,u.rateOfFire);u.recentFire=this.rules.signature.firing_seconds;
     u.heading=Math.atan2(target.y-u.y,target.x-u.x);
 
-    if(u.indirectFire){this._scheduleArtillery(u,target.x,target.y,.45+.55*obs.q);return true;}
+    if(u.indirectFire){this._scheduleArtillery(u,target.x,target.y,.45+.55*q);return true;}
 
     const c=this.rules.combat,supPenalty=1-(u.suppression/u.maxSuppression)*c.suppression_accuracy_penalty;
     let fc;
-    if(obs.q<s.fire_control_threshold){
-      const t=clamp((obs.q-s.track_threshold)/(s.fire_control_threshold-s.track_threshold),0,1);fc=lerp(c.weak_track_accuracy_min,c.weak_track_accuracy_max,t);
+    if(q<s.fire_control_threshold){
+      const t=clamp((q-s.track_threshold)/(s.fire_control_threshold-s.track_threshold),0,1);fc=lerp(c.weak_track_accuracy_min,c.weak_track_accuracy_max,t);
     }else{
-      const t=clamp((obs.q-s.fire_control_threshold)/(1-s.fire_control_threshold),0,1);fc=lerp(c.fire_control_accuracy_min,1,t);
+      const t=clamp((q-s.fire_control_threshold)/(1-s.fire_control_threshold),0,1);fc=lerp(c.fire_control_accuracy_min,1,t);
     }
     const effectiveAcc=clamp(u.accuracy*fc*supPenalty,.01,.98),hit=Math.random()<effectiveAcc;
     this._addEvent({type:'direct_shot',faction:u.faction,from:{x:u.x,y:u.y,z:u.z+.25},to:{x:target.x,y:target.y,z:target.z+.25},hit,duration:.22});
@@ -642,6 +648,47 @@ export class GameSimulation {
     this._addEvent({type:'impact',faction:shooter.faction,at:{x,y,z:this.heightAt(x,y)+.15},radius:r,duration:.35});
   }
 
+  _engageTrackedTarget(u,target,known,orderKind='attack_target'){
+    const d=dist(u,target),minR=u.minRange??0,stopR=this._attackStopRange(u);
+    const hasFiringGeometry=u.indirectFire||this._lineOfSight(u,target);
+
+    if(d<minR){
+      // Minimum range remains an intentional vulnerability: no automatic kiting.
+      u.path=[];u.moveGoal=null;u.attackHolding=true;u.attackPathTarget=null;
+      return 'too_close';
+    }
+
+    // A direct-fire weapon must also have actual firing geometry. Being inside
+    // range behind a ridge/occluder is still CHASE, not HOLD.
+    if(!hasFiringGeometry){
+      u.attackHolding=false;
+      this._navigateAttack(u,known,orderKind);
+      return 'chase_los';
+    }
+
+    // Hysteresis state machine shared by explicit and autonomous attacks:
+    // CHASE until R-h, HOLD/FIRE while <=R, RE-CHASE only after crossing >R.
+    if(u.attackHolding){
+      if(d>u.weaponRange){
+        u.attackHolding=false;
+      }else{
+        u.path=[];u.moveGoal=null;u.attackPathTarget=null;
+        if(u.fireCooldown<=0)this._fireAt(u,target);
+        return 'attack';
+      }
+    }
+
+    if(d>stopR){
+      this._navigateAttack(u,known,orderKind);
+      return 'chase';
+    }
+
+    u.attackHolding=true;
+    u.path=[];u.moveGoal=null;u.attackPathTarget=null;
+    if(u.fireCooldown<=0)this._fireAt(u,target);
+    return 'attack';
+  }
+
   _updateCombat(u,dt){
     const c=this.rules.combat;
     u.fireCooldown=Math.max(0,u.fireCooldown-dt);u.recentFire=Math.max(0,u.recentFire-dt);u.suppression=Math.max(0,u.suppression-c.suppression_decay_per_second*dt);
@@ -666,46 +713,40 @@ export class GameSimulation {
         this._navigateAttack(u,p);return;
       }
 
-      const d=dist(u,target),minR=u.minRange??0,stopR=this._attackStopRange(u);
-      if(d<minR){
-        // No automatic kiting: minimum range is an intentional vulnerability.
-        u.path=[];u.moveGoal=null;
-        return;
-      }
-      if(d>u.weaponRange){this._navigateAttack(u,known);return;}
-      if(d>stopR){
-        // Enter the range band, then continue a little further before stopping.
-        // This 0.2-tile hysteresis prevents move/fire oscillation at the exact boundary.
-        this._navigateAttack(u,known);return;
-      }
-
-      u.path=[];u.moveGoal=null;u.attackPathTarget=null;
-      if(u.fireCooldown<=0)this._fireAt(u,target);
+      this._engageTrackedTarget(u,target,known,'attack_target');
       return;
     }
 
+    const previousAutoTarget=u.autoTarget;
     let target=this._selectAutoTarget(u);u.autoTarget=target?.id??null;
     if(target){
-      const d=dist(u,target),minR=u.minRange??0,stopR=this._attackStopRange(u);
-      if(d>=minR&&d<=u.weaponRange){
-        // Autonomous fire does not cancel an explicit Move destination.
-        if(u.fireCooldown<=0)this._fireAt(u,target);
-        return;
+      if(previousAutoTarget!==target.id){
+        u.attackHolding=false;u.attackPathTarget=null;u.attackRepathAt=0;
       }
+
       const autonomousPathFree=!u.moveGoal||u.orderKind==='auto_chase';
-      if(autonomousPathFree&&d>u.weaponRange){
+      if(autonomousPathFree){
         if(u.stance==='aggressive'){
-          this._navigateAttack(u,{x:target.x,y:target.y},'auto_chase');u.autoChasing=true;
+          this._engageTrackedTarget(u,target,{x:target.x,y:target.y,level:this._intelFor(u.faction,target).level},'auto_chase');
+          u.autoChasing=true;
         }else if(u.stance==='defensive'){
           const anchor=u.defensiveAnchor??{x:u.x,y:u.y};
           const maxFromAnchor=u.weaponRange+this.rules.ai.defensive_chase_range;
           if(Math.hypot(target.x-anchor.x,target.y-anchor.y)<=maxFromAnchor){
-            this._navigateAttack(u,{x:target.x,y:target.y},'auto_chase');u.autoChasing=true;
+            this._engageTrackedTarget(u,target,{x:target.x,y:target.y,level:this._intelFor(u.faction,target).level},'auto_chase');
+            u.autoChasing=true;
           }
         }
+      }else{
+        // While executing an explicit Move, stances may opportunistically fire at a
+        // target already inside the current firing band, but never abandon the route.
+        const d=dist(u,target),minR=u.minRange??0;
+        if(d>=minR&&d<=u.weaponRange&&u.fireCooldown<=0)this._fireAt(u,target);
       }
       return;
     }
+
+    u.attackHolding=false;
 
     // AoE/C&C-style defensive leash: after an autonomous defensive chase, return.
     if(u.autoChasing&&u.stance==='defensive'&&!u.moveGoal){

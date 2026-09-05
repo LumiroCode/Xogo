@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.5-gameplay",
+  "schema_version": "0.6-gameplay",
   "battlefield": {
     "visibility": 1.0,
     "mobility": 1.0,
@@ -69,7 +69,9 @@
     "attack_stop_hysteresis": 0.2,
     "attack_repath_seconds": 0.25,
     "attack_repath_distance": 0.3,
-    "attack_last_known_arrival": 0.18
+    "attack_last_known_arrival": 0.18,
+    "shared_fire_control": true,
+    "artillery_unit_targeting": true
   },
   "supply": {
     "transfer_per_second": 18,
