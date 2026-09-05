@@ -30,6 +30,8 @@ export class GameViewAdapter {
   setFlag(name,value){ this.r.setFlag(name,value); }
   toggleFlag(name){ return this.r.toggle(name); }
   pick(clientX,clientY){ return this.r.entityAt(clientX,clientY); }
+  pickRect(rect,options={}){ return this.r.entitiesInRect(rect,options); }
+  entityIdsOnScreen(options={}){ return this.r.entityIdsOnScreen(options); }
   screenToWorld(clientX,clientY){ return this.r.screenToWorld(clientX,clientY); }
   render(frameState={}){ this.r.render(frameState); }
 

@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.3-mvp",
+  "schema_version": "0.4-mvp",
   "units": {
     "height": "abstract height units",
     "footprint": "abstract ground-area units",
@@ -31,7 +31,8 @@
     "fuel": "not in MVP",
     "cohesion": "not in MVP",
     "assembly": "platform + weapon + specialization",
-    "ammo_capacity_mvp_note": "Platform supply capacities multiplied by 4 vs MVP 0.2 to shift supply from firefight micro toward operational endurance."
+    "ammo_capacity_mvp_note": "Platform supply capacities multiplied by 4 vs MVP 0.2 to shift supply from firefight micro toward operational endurance.",
+    "splash_note": "Every attack has splashRadius; 0 means point damage. Artillery must use splashRadius > 0."
   },
   "platforms": {
     "light_infantry": {
@@ -118,8 +119,8 @@
       "suppressionPower": 8,
       "rateOfFire": 1.5,
       "minRange": 0,
-      "blastRadius": 0,
-      "indirectFire": false
+      "indirectFire": false,
+      "splashRadius": 0
     },
     "rifle": {
       "weaponRange": 6,
@@ -128,8 +129,8 @@
       "suppressionPower": 10,
       "rateOfFire": 1.0,
       "minRange": 0,
-      "blastRadius": 0,
-      "indirectFire": false
+      "indirectFire": false,
+      "splashRadius": 0
     },
     "machine_gun": {
       "weaponRange": 6,
@@ -138,8 +139,8 @@
       "suppressionPower": 26,
       "rateOfFire": 4.0,
       "minRange": 0,
-      "blastRadius": 0,
-      "indirectFire": false
+      "indirectFire": false,
+      "splashRadius": 0
     },
     "autocannon": {
       "weaponRange": 8,
@@ -148,8 +149,8 @@
       "suppressionPower": 18,
       "rateOfFire": 2.0,
       "minRange": 0,
-      "blastRadius": 0,
-      "indirectFire": false
+      "indirectFire": false,
+      "splashRadius": 0
     },
     "heavy_cannon": {
       "weaponRange": 10,
@@ -158,8 +159,8 @@
       "suppressionPower": 35,
       "rateOfFire": 0.4,
       "minRange": 0,
-      "blastRadius": 0,
-      "indirectFire": false
+      "indirectFire": false,
+      "splashRadius": 0
     },
     "none": {
       "weaponRange": 0,
@@ -168,8 +169,8 @@
       "suppressionPower": 0,
       "rateOfFire": 0.0,
       "minRange": 0,
-      "blastRadius": 0,
-      "indirectFire": false
+      "indirectFire": false,
+      "splashRadius": 0
     },
     "artillery": {
       "weaponRange": 14,
@@ -178,8 +179,8 @@
       "accuracy": 0.58,
       "suppressionPower": 68,
       "rateOfFire": 0.18,
-      "blastRadius": 1.15,
-      "indirectFire": true
+      "indirectFire": true,
+      "splashRadius": 1.15
     }
   },
   "specializations": {
@@ -306,13 +307,13 @@
       "suppressionPower": 8,
       "rateOfFire": 1.5,
       "minRange": 0,
-      "blastRadius": 0,
       "indirectFire": false,
       "size": 1.8,
       "weight": 1.8,
       "supplyState": 96,
       "weaponId": "carbine",
-      "specializationId": "recon_package"
+      "specializationId": "recon_package",
+      "splashRadius": 0
     },
     "line_infantry": {
       "height": 1.8,
@@ -334,13 +335,13 @@
       "suppressionPower": 10,
       "rateOfFire": 1.0,
       "minRange": 0,
-      "blastRadius": 0,
       "indirectFire": false,
       "size": 2.16,
       "weight": 2.16,
       "supplyState": 128,
       "weaponId": "rifle",
-      "specializationId": "armor_package"
+      "specializationId": "armor_package",
+      "splashRadius": 0
     },
     "suppression_infantry": {
       "height": 1.8,
@@ -362,13 +363,13 @@
       "suppressionPower": 26,
       "rateOfFire": 4.0,
       "minRange": 0,
-      "blastRadius": 0,
       "indirectFire": false,
       "size": 2.16,
       "weight": 2.16,
       "supplyState": 230.4,
       "weaponId": "machine_gun",
-      "specializationId": "ammo_package"
+      "specializationId": "ammo_package",
+      "splashRadius": 0
     },
     "tracked_raider": {
       "height": 2.2,
@@ -390,13 +391,13 @@
       "suppressionPower": 18,
       "rateOfFire": 2.0,
       "minRange": 0,
-      "blastRadius": 0,
       "indirectFire": false,
       "size": 8.8,
       "weight": 8.8,
       "supplyState": 192,
       "weaponId": "autocannon",
-      "specializationId": "signature_reduction_package"
+      "specializationId": "signature_reduction_package",
+      "splashRadius": 0
     },
     "assault_walker": {
       "height": 5.0,
@@ -418,13 +419,13 @@
       "suppressionPower": 35,
       "rateOfFire": 0.4,
       "minRange": 0,
-      "blastRadius": 0,
       "indirectFire": false,
       "size": 45.0,
       "weight": 45.0,
       "supplyState": 224,
       "weaponId": "heavy_cannon",
-      "specializationId": "fire_control_package"
+      "specializationId": "fire_control_package",
+      "splashRadius": 0
     },
     "recon_drone": {
       "height": 8.0,
@@ -446,13 +447,13 @@
       "suppressionPower": 0,
       "rateOfFire": 0.0,
       "minRange": 0,
-      "blastRadius": 0,
       "indirectFire": false,
       "size": 12.0,
       "weight": 12.0,
       "supplyState": 72,
       "weaponId": "none",
-      "specializationId": "recon_package"
+      "specializationId": "recon_package",
+      "splashRadius": 0
     },
     "tracked_supply_carrier": {
       "height": 2.2,
@@ -474,13 +475,13 @@
       "suppressionPower": 0,
       "rateOfFire": 0.0,
       "minRange": 0,
-      "blastRadius": 0,
       "indirectFire": false,
       "size": 8.8,
       "weight": 8.8,
       "supplyState": 412,
       "weaponId": "none",
-      "specializationId": "cargo_package"
+      "specializationId": "cargo_package",
+      "splashRadius": 0
     },
     "tracked_artillery": {
       "height": 2.2,
@@ -502,13 +503,13 @@
       "accuracy": 0.58,
       "suppressionPower": 68,
       "rateOfFire": 0.18,
-      "blastRadius": 1.15,
       "indirectFire": true,
       "size": 8.8,
       "weight": 8.8,
       "supplyState": 345.6,
       "weaponId": "artillery",
-      "specializationId": "ammo_package"
+      "specializationId": "ammo_package",
+      "splashRadius": 1.15
     }
   }
 }

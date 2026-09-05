@@ -39,7 +39,7 @@ function showSelection(){
   const units=sim.getSelectedUnits();
   if(!units.length){
     nameEl.textContent='Brak zaznaczenia';
-    statsEl.textContent='LPM: wybór · Shift+LPM: dodaj/usuń · PPM: ruch/atak\nAlt+LPM lub środkowy: kamera · G: attack ground';
+    statsEl.textContent='LPM: wybór · przeciągnij LPM: prostokąt wyboru · Shift: dodaj/usuń\n2×LPM: ten sam loadout na ekranie · PPM: kontekst (jednostka ma precedens nad mapą)\nAlt+LPM lub środkowy: kamera · G: attack ground';
     return;
   }
   if(units.length>1){
@@ -50,7 +50,7 @@ function showSelection(){
     return;
   }
   const u=units[0],ammoPct=u.supplyCapacity>0?Math.round((u.supplyState/u.supplyCapacity)*100):0;
-  statsEl.textContent=`${u.assembly.platform}\n+ ${u.assembly.weapon}\n+ ${u.assembly.specialization}\n\nHP ${Math.round(u.hp)} / ${Math.round(u.maxHp)}\nSupresja ${Math.round(u.suppression)} / ${u.maxSuppression}\nAmunicja ${ammoPips(u)}  ${Math.round(u.supplyState)} / ${Math.round(u.supplyCapacity)} (${ammoPct}%)\nRuch ${u.speed.toFixed(2)} pola/s\nEyes ${sim.getVisualRange(u).toFixed(1)} · sensor ${u.sensorRange.toFixed(1)}\nPostawa: ${u.stance}${u.configuration==='tracked_supply_carrier'?`\nAuto supply: ${u.autoSupply?'ON':'OFF'}`:''}\nRola: ${u.role}`;
+  statsEl.textContent=`${u.assembly.platform}\n+ ${u.assembly.weapon}\n+ ${u.assembly.specialization}\n\nHP ${Math.round(u.hp)} / ${Math.round(u.maxHp)}\nSupresja ${Math.round(u.suppression)} / ${u.maxSuppression}\nAmunicja ${ammoPips(u)}  ${Math.round(u.supplyState)} / ${Math.round(u.supplyCapacity)} (${ammoPct}%)\nRuch ${u.speed.toFixed(2)} pola/s\nBroń: range ${u.minRange??0}–${u.weaponRange} · splash ${Number(u.splashRadius??0).toFixed(2)}\nEyes ${sim.getVisualRange(u).toFixed(1)} · sensor ${u.sensorRange.toFixed(1)}\nPostawa: ${u.stance}${u.configuration==='tracked_supply_carrier'?`\nAuto supply: ${u.autoSupply?'ON':'OFF'}`:''}\nRola: ${u.role}`;
   nameEl.textContent=u.label;
 }
 
@@ -64,13 +64,36 @@ function commandFeedback(result){
   if(result?.kind==='insufficient_intel')status.textContent=`${result.level.toUpperCase()}: brak stabilnego tracku — użyj G + PPM albo popraw rozpoznanie`;
   else if(result?.kind==='attack_ground')status.textContent=`attack ground · ${result.count} jednostek`;
   else if(result?.kind==='attack')status.textContent=`atak: ${result.target.label}`;
+  else if(result?.kind==='friendly_entity')status.textContent='sprzymierzona jednostka pod kursorem — interakcja z jednostką ma precedens nad ruchem po mapie';
+  else if(result?.kind==='move')status.textContent=`ruch → ${result.x.toFixed(1)}, ${result.y.toFixed(1)}`;
+}
+
+function updatePointerCursor(e){
+  if(input?.isSelecting?.()){canvas.style.cursor='crosshair';return;}
+  const picked=view.pick(e.clientX,e.clientY),selected=sim.getSelectedUnits();
+  if(picked?.selectable){canvas.style.cursor='pointer';return;}
+  if(picked && selected.length){canvas.style.cursor='crosshair';return;}
+  canvas.style.cursor=selected.length?'move':'default';
 }
 
 const input=new Input(canvas,renderer.camera,{
-  pointerDown:e=>{
-    if(e.button===0){sim.selectAt(e.clientX,e.clientY,e.shiftKey);showSelection();}
-    if(e.button===2){commandFeedback(sim.commandContext(e.clientX,e.clientY));showSelection();updateMode();}
+  primaryClick:(e,gesture)=>{
+    if(gesture.ctrl)sim.selectSameConfigurationAt(e.clientX,e.clientY,gesture.additive);
+    else sim.selectAt(e.clientX,e.clientY,gesture.additive);
+    showSelection();
   },
+  primaryDoubleClick:(e,gesture)=>{
+    sim.selectSameConfigurationAt(e.clientX,e.clientY,gesture.additive);
+    showSelection();
+  },
+  selectionBoxEnd:(rect,e,gesture)=>{
+    sim.selectRect(rect,gesture.additive);
+    showSelection();
+  },
+  contextCommand:e=>{
+    commandFeedback(sim.commandContext(e.clientX,e.clientY));showSelection();updateMode();
+  },
+  pointerMove:updatePointerCursor,
   keyDown:e=>{
     if(e.repeat)return;
     const presentationFlags={KeyV:'sensors',KeyB:'grid',KeyH:'heights',KeyF:'fog'};
@@ -93,10 +116,10 @@ showSelection();updateMode();
 let prev=performance.now(),hudClock=0;
 function loop(now){
   const dt=Math.min(.05,(now-prev)/1000);prev=now;input.update(dt);sim.update(dt);
-  view.render(framePresenter.present(sim.getFrame()));
+  view.render({...framePresenter.present(sim.getFrame()),selectionBox:input.getSelectionBox()});
   hudClock+=dt;if(hudClock>.18){hudClock=0;showSelection();updateMode();}
   if(!status.textContent.includes('brak stabilnego')&&!status.textContent.startsWith('attack ground')&&!status.textContent.startsWith('atak:')){
-    status.textContent=`game logic 0.3 · ${renderer.assets.composer.cache.size} loadouts cached · Canvas 2D`;
+    status.textContent=`game logic 0.4 · sprite hit-test · box select · ${renderer.assets.composer.cache.size} loadouts cached`;
   }
   requestAnimationFrame(loop);
 }

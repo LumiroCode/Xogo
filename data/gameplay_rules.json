@@ -1,5 +1,5 @@
 {
-  "schema_version": "0.3-gameplay",
+  "schema_version": "0.4-gameplay",
   "battlefield": {
     "visibility": 1.0,
     "mobility": 1.0,
@@ -25,13 +25,13 @@
     "size_cover_scale": 7.0,
     "local_cluster_radius": 0.85,
     "local_cluster_step": 0.08,
-    "local_cluster_cap": 0.30
+    "local_cluster_cap": 0.3
   },
   "los": {
     "cover_occlusion_scale": 0.92,
     "occlusion_limit": 1.35,
     "elevation_margin": 0.15,
-    "sample_step": 0.20
+    "sample_step": 0.2
   },
   "sensors": {
     "visual_base_range": 1.5,
@@ -41,7 +41,7 @@
     "visual_strength": 100,
     "visual_resolution": 100,
     "visual_close_identify_range": 0.45,
-    "visual_visibility_floor": 0.70,
+    "visual_visibility_floor": 0.7,
     "range_falloff_power": 1.35,
     "strength_weight": 0.64,
     "signature_weight": 0.36,
@@ -57,27 +57,28 @@
     "suppression_move_penalty": 0.45,
     "suppression_armor_scale": 55,
     "suppression_size_scale": 24,
-    "cover_suppression_reduction": 0.70,
+    "cover_suppression_reduction": 0.7,
     "front_armor_half_angle_deg": 65,
     "weak_track_accuracy_min": 0.18,
     "weak_track_accuracy_max": 0.52,
     "fire_control_accuracy_min": 0.62,
     "artillery_flight_time": 0.75,
     "artillery_scatter_scale": 1.05,
-    "direct_attack_ground_radius": 0.45
+    "direct_attack_ground_radius": 0.45,
+    "splash_falloff_strength": 4.0
   },
   "supply": {
     "transfer_per_second": 18,
     "transfer_range": 1.35,
     "auto_request_ratio": 0.55,
-    "auto_stop_ratio": 0.90,
+    "auto_stop_ratio": 0.9,
     "auto_safe_enemy_range": 4.25,
     "auto_standoff": 0.95,
     "auto_think_seconds": 0.55,
     "manual_override_seconds": 6.0
   },
   "ai": {
-    "think_seconds": 0.40,
+    "think_seconds": 0.4,
     "defensive_chase_range": 1.0,
     "aggressive_chase_range": 4.0,
     "retreat_hp_fraction": 0.22,

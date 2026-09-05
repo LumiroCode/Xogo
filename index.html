@@ -3,24 +3,26 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RTS AI — tactical logic 0.3 + modular renderer</title>
+  <title>RTS AI — tactical logic 0.4 + modular renderer</title>
   <link rel="stylesheet" href="./assets/ui/style.css" />
 </head>
 <body>
   <div id="app">
     <canvas id="game" aria-label="Pole bitwy"></canvas>
     <div id="topbar">
-      <strong>RTS AI // tactical matrix 0.3</strong>
+      <strong>RTS AI // tactical matrix 0.4</strong>
       <a href="./gallery.html" style="color:#a9d8eb">galeria modułów</a>
       <span id="mode-status">—</span>
       <span id="status">inicjalizacja…</span>
     </div>
     <aside id="hud">
       <div class="hud-title" id="unit-name">Brak zaznaczenia</div>
-      <div id="unit-stats" class="hud-body">LPM: wybór · PPM: ruch · kółko: zoom · WASD: kamera</div>
+      <div id="unit-stats" class="hud-body">LPM: wybór · przeciągnij LPM: box select · PPM: kontekst · kółko: zoom</div>
     </aside>
     <div id="legend">
-      <span><kbd>Shift</kbd>+LPM grupa</span>
+      <span><kbd>LPM drag</kbd> box select</span>
+      <span><kbd>Shift</kbd>+LPM dodaj/usuń</span>
+      <span><kbd>2×LPM</kbd> ten sam loadout</span>
       <span><kbd>G</kbd> attack ground</span>
       <span><kbd>Z</kbd> formacja</span>
       <span><kbd>1–4</kbd> postawa</span>

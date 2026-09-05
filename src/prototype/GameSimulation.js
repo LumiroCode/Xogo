@@ -54,6 +54,7 @@ export class GameSimulation {
       ? {...this.unitDefs.resolved_test_units[instance.configuration]}
       : resolveAssembly(this.unitDefs,assembly);
     const cfg=instance.configuration ? this.unitDefs.test_configurations[instance.configuration] : null;
+    if(resolved.indirectFire && !(resolved.splashRadius>0)) throw new Error(`Unit ${instance.id}: indirect-fire weapon requires splashRadius > 0`);
     const z=this.heightAt(instance.x,instance.y)+(resolved.locomotionClass==='air'?1.8:0);
     const maxHp=instance.maxHp ?? resolved.durability;
     const maxSuppression=instance.maxSuppression ?? 100;
@@ -86,15 +87,36 @@ export class GameSimulation {
 
   selectAt(cx,cy,additive=false){
     const e=this.view.pick(cx,cy);
-    if(e?.selectable && this.units.get(e.id)?.alive){
+    const u=e?.selectable ? this.units.get(e.id) : null;
+    if(u?.alive && u.faction==='human'){
       if(!additive)this.selected=[];
-      if(additive && this.selected.includes(e.id)) this.selected=this.selected.filter(id=>id!==e.id);
-      else if(!this.selected.includes(e.id)) this.selected.push(e.id);
+      if(additive && this.selected.includes(e.id))this.selected=this.selected.filter(id=>id!==e.id);
+      else if(!this.selected.includes(e.id))this.selected.push(e.id);
       this.view.setSelection(this.selected);
-      return this.units.get(e.id);
+      return u;
     }
     if(!additive){this.selected=[];this.view.setSelection([]);}
     return null;
+  }
+
+  selectRect(rect,additive=false){
+    const hits=this.view.pickRect(rect,{selectableOnly:true});
+    const ids=hits.map(e=>e.id).filter(id=>{const u=this.units.get(id);return u?.alive&&u.faction==='human';});
+    if(!additive)this.selected=[];
+    for(const id of ids)if(!this.selected.includes(id))this.selected.push(id);
+    this.view.setSelection(this.selected);
+    return this.getSelectedUnits();
+  }
+
+  selectSameConfigurationAt(cx,cy,additive=false){
+    const e=this.view.pick(cx,cy),clicked=e?.selectable?this.units.get(e.id):null;
+    if(!clicked?.alive||clicked.faction!=='human')return null;
+    const onScreen=new Set(this.view.entityIdsOnScreen({selectableOnly:true}));
+    const ids=[...this.units.values()].filter(u=>u.alive&&u.faction==='human'&&u.configuration===clicked.configuration&&onScreen.has(u.id)).map(u=>u.id);
+    if(!additive)this.selected=[];
+    for(const id of ids)if(!this.selected.includes(id))this.selected.push(id);
+    this.view.setSelection(this.selected);
+    return this.getSelectedUnits();
   }
 
   getSelectedUnits(){return this.selected.map(id=>this.units.get(id)).filter(u=>u?.alive);}
@@ -103,12 +125,14 @@ export class GameSimulation {
 
   commandContext(cx,cy){
     if(!this.selected.length)return {kind:'none'};
-    const world=this.view.screenToWorld(cx,cy);
-    const x=clamp(world.x,.05,this.map.width-.05),y=clamp(world.y,.05,this.map.height-.05);
 
+    // Explicit modal command is the only deliberate exception to entity precedence:
+    // attack-ground asks for a map point by definition, even when a sprite is under the cursor.
     if(this.attackGroundMode){
+      const world=this.view.screenToWorld(cx,cy);
+      const x=clamp(world.x,.05,this.map.width-.05),y=clamp(world.y,.05,this.map.height-.05);
       let count=0;
-      for(const u of this.getSelectedUnits()) if(u.rateOfFire>0){
+      for(const u of this.getSelectedUnits())if(u.rateOfFire>0){
         u.groundTarget={x,y};u.manualTarget=null;u.autoTarget=null;u.path=[];u.moveGoal=null;count++;
       }
       this.commandMarker={x,y,time:performance.now(),kind:'attack_ground'};
@@ -116,20 +140,26 @@ export class GameSimulation {
       return {kind:'attack_ground',count,x,y};
     }
 
+    // Default contextual command: presentation entity first, map only when no entity was hit.
     const picked=this.view.pick(cx,cy);
-    const target=picked ? this.units.get(picked.id) : null;
-    if(target?.alive && target.faction!=='human'){
-      const intel=this._intelFor('human',target);
-      if(intel.level==='contact' || intel.level==='unknown'){
-        return {kind:'insufficient_intel',level:intel.level};
+    const target=picked?this.units.get(picked.id):null;
+    if(target?.alive){
+      if(target.faction!=='human'){
+        const intel=this._intelFor('human',target);
+        if(intel.level==='contact'||intel.level==='unknown')return {kind:'insufficient_intel',level:intel.level,target};
+        for(const u of this.getSelectedUnits()){
+          u.manualTarget=target.id;u.autoTarget=null;u.groundTarget=null;u.path=[];u.moveGoal=null;
+        }
+        this.commandMarker={x:target.x,y:target.y,time:performance.now(),kind:'attack'};
+        return {kind:'attack',target};
       }
-      for(const u of this.getSelectedUnits()){
-        u.manualTarget=target.id;u.autoTarget=null;u.groundTarget=null;u.path=[];u.moveGoal=null;
-      }
-      this.commandMarker={x:target.x,y:target.y,time:performance.now(),kind:'attack'};
-      return {kind:'attack',target};
+      // Friendly sprite consumed the interaction. A future contextual action (follow/repair/etc.)
+      // can live here without ever falling through to an accidental map move.
+      return {kind:'friendly_entity',target};
     }
 
+    const world=this.view.screenToWorld(cx,cy);
+    const x=clamp(world.x,.05,this.map.width-.05),y=clamp(world.y,.05,this.map.height-.05);
     this._issueFormationMove(this.getSelectedUnits(),x,y,true);
     this.commandMarker={x,y,time:performance.now(),kind:'move'};
     return {kind:'move',x,y};
@@ -490,8 +520,12 @@ export class GameSimulation {
 
     const cover=this._effectiveCover(target),armor=this._armorAgainst(target,u),supRes=(1-cover*c.cover_suppression_reduction)*(1-clamp(armor/c.suppression_armor_scale,0,.55))/(1+target.size/c.suppression_size_scale);
     if(hit){
-      const dmg=Math.max(0,u.damage-armor);target.hp=Math.max(0,target.hp-dmg);target.suppression=clamp(target.suppression+u.suppressionPower*supRes,0,target.maxSuppression);
-      if(target.hp<=0)this._kill(target,u);
+      if((u.splashRadius??0)>0){
+        this._applySplashImpact(u,target.x,target.y,u.splashRadius,1,target);
+      }else{
+        const dmg=Math.max(0,u.damage-armor);target.hp=Math.max(0,target.hp-dmg);target.suppression=clamp(target.suppression+u.suppressionPower*supRes,0,target.maxSuppression);
+        if(target.hp<=0)this._kill(target,u);
+      }
     }else target.suppression=clamp(target.suppression+u.suppressionPower*.28*supRes,0,target.maxSuppression);
     return true;
   }
@@ -507,7 +541,7 @@ export class GameSimulation {
     else{
       const c=this.rules.combat,miss=Math.max(0,1-u.accuracy),a=Math.random()*TAU,r=Math.sqrt(Math.random())*miss*.55,ix=clamp(x+Math.cos(a)*r,.05,this.map.width-.05),iy=clamp(y+Math.sin(a)*r,.05,this.map.height-.05);
       this._addEvent({type:'direct_shot',faction:u.faction,from:{x:u.x,y:u.y,z:u.z+.25},to:{x:ix,y:iy,z:this.heightAt(ix,iy)+.2},hit:false,duration:.22});
-      this._applyGroundImpact(u,ix,iy,Math.max(c.direct_attack_ground_radius,u.blastRadius??0),.45);
+      this._applySplashImpact(u,ix,iy,Math.max(c.direct_attack_ground_radius,u.splashRadius??0),.45);
     }
     return true;
   }
@@ -515,20 +549,25 @@ export class GameSimulation {
   _scheduleArtillery(u,x,y,accuracyFactor){
     const c=this.rules.combat,d=Math.hypot(x-u.x,y-u.y),miss=Math.max(0,1-u.accuracy*accuracyFactor),scatter=miss*c.artillery_scatter_scale*(.45+.55*d/Math.max(1,u.weaponRange)),a=Math.random()*TAU,r=Math.sqrt(Math.random())*scatter;
     const ix=clamp(x+Math.cos(a)*r,.05,this.map.width-.05),iy=clamp(y+Math.sin(a)*r,.05,this.map.height-.05);
-    this._addEvent({type:'artillery_round',faction:u.faction,from:{x:u.x,y:u.y,z:u.z+.5},to:{x:ix,y:iy,z:this.heightAt(ix,iy)+.2},duration:c.artillery_flight_time,applied:false,shooterId:u.id,damage:u.damage,suppressionPower:u.suppressionPower,radius:Math.max(.3,u.blastRadius??1)});
+    this._addEvent({type:'artillery_round',faction:u.faction,from:{x:u.x,y:u.y,z:u.z+.5},to:{x:ix,y:iy,z:this.heightAt(ix,iy)+.2},duration:c.artillery_flight_time,applied:false,shooterId:u.id,damage:u.damage,suppressionPower:u.suppressionPower,radius:Math.max(.01,u.splashRadius??0)});
   }
 
-  _applyGroundImpact(shooter,x,y,radius,damageScale=1){
-    const c=this.rules.combat;
+  _applySplashImpact(shooter,x,y,radius,damageScale=1,primaryTarget=null){
+    const c=this.rules.combat,r=Math.max(.001,radius),k=c.splash_falloff_strength??4;
     for(const target of this.units.values())if(target.alive){
-      const d=Math.hypot(target.x-x,target.y-y);if(d>radius)continue;
-      const falloff=clamp(1-d/radius,.15,1),cover=this._effectiveCover(target),armor=target.armorOther??0,dmg=Math.max(0,shooter.damage*damageScale*falloff-armor);
+      const d=Math.hypot(target.x-x,target.y-y);if(d>r)continue;
+      // Stable inverse-distance falloff: full effect at the epicentre, then rapidly
+      // decreasing towards the edge. Cut off completely outside splashRadius.
+      const falloff=1/(1+k*(d/r));
+      const cover=this._effectiveCover(target);
+      const armor=primaryTarget?.id===target.id ? this._armorAgainst(target,shooter) : (target.armorOther??0);
+      const dmg=Math.max(0,shooter.damage*damageScale*falloff-armor);
       target.hp=Math.max(0,target.hp-dmg);
       const supRes=(1-cover*c.cover_suppression_reduction)*(1-clamp(armor/c.suppression_armor_scale,0,.55))/(1+target.size/c.suppression_size_scale);
       target.suppression=clamp(target.suppression+shooter.suppressionPower*falloff*supRes,0,target.maxSuppression);
       if(target.hp<=0)this._kill(target,shooter);
     }
-    this._addEvent({type:'impact',faction:shooter.faction,at:{x,y,z:this.heightAt(x,y)+.15},radius,duration:.35});
+    this._addEvent({type:'impact',faction:shooter.faction,at:{x,y,z:this.heightAt(x,y)+.15},radius:r,duration:.35});
   }
 
   _updateCombat(u,dt){
@@ -609,7 +648,7 @@ export class GameSimulation {
         e.applied=true;
         const live=this.units.get(e.shooterId);
         const source=live??{damage:e.damage,suppressionPower:e.suppressionPower,faction:e.faction};
-        this._applyGroundImpact(source,e.to.x,e.to.y,e.radius,1);
+        this._applySplashImpact(source,e.to.x,e.to.y,e.radius,1);
       }
     }
     this.events=this.events.filter(e=>e.age<e.duration);

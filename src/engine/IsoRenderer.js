@@ -15,6 +15,7 @@ export class IsoRenderer {
     this.assets=new AssetStore();
     this.map=null;
     this.flags={grid:false, heights:false, sensors:false, fog:true};
+    this._alphaMasks=new WeakMap();
     this.resizeObserver=new ResizeObserver(()=>this.resize());
     this.resizeObserver.observe(canvas);
     this.resize();
@@ -47,17 +48,110 @@ export class IsoRenderer {
     return {x:Math.max(best.x,Math.min(best.x+.999,exact.x)),y:Math.max(best.y,Math.min(best.y+.999,exact.y))};
   }
 
+  /**
+   * Top-most presentation object under the pointer.
+   * Identified/fire-control units use pixel-perfect sprite alpha hit testing.
+   * Abstract intel glyphs use the geometry actually drawn on screen.
+   * Last-known markers are deliberately non-interactive: they are memories, not units.
+   */
   entityAt(clientX,clientY){
-    const r=this.canvas.getBoundingClientRect(), mx=clientX-r.left, my=clientY-r.top;
+    const r=this.canvas.getBoundingClientRect(),mx=clientX-r.left,my=clientY-r.top;
     for(const e of this._sortedEntities().reverse()){
-      if(e.visibility==='hidden') continue;
-      const a=this.assets.resolve(e.visual); if(!a) continue;
-      const s=this._entityScreen(e,r.width,r.height), z=this.camera.zoom;
-      const w=(a.width??86)*z,h=(a.height??70)*z;
-      const ax=(a.anchorX??(a.width??86)/2)*z, ay=(a.anchorY??(a.height??70))*z;
-      if(mx>=s.x-ax && mx<=s.x+(w-ax) && my>=s.y-ay && my<=s.y+(h-ay)+8*z) return e;
+      if(e.visibility==='hidden'||e.visibility==='lastKnown')continue;
+      const s=this._entityScreen(e,r.width,r.height),z=this.camera.zoom;
+      if(e.visibility==='contact'){
+        if(Math.hypot(mx-s.x,my-s.y)<=10*z)return e;
+        continue;
+      }
+      if(e.visibility==='track'){
+        const rr=10*z,dx=Math.abs(mx-s.x),dy=Math.abs(my-s.y);
+        if(dx+dy<=rr)return e;
+        continue;
+      }
+      const a=this.assets.resolve(e.visual);if(!a)continue;
+      if(this._spritePixelHit(a,e,s,mx,my,z))return e;
     }
     return null;
+  }
+
+  /**
+   * Returns presentation entities whose *visible sprite pixels* intersect a screen-space
+   * selection rectangle. This intentionally does not use logical world positions.
+   */
+  entitiesInRect(rect,{selectableOnly=false}={}){
+    if(!rect)return[];
+    const r=this.canvas.getBoundingClientRect(),out=[];
+    for(const e of this._sortedEntities()){
+      if(e.visibility==='hidden'||e.visibility==='lastKnown')continue;
+      if(selectableOnly&&!e.selectable)continue;
+      const s=this._entityScreen(e,r.width,r.height),z=this.camera.zoom;
+      if(e.visibility==='contact'){
+        if(this._circleIntersectsRect(s.x,s.y,6*z,rect))out.push(e);
+        continue;
+      }
+      if(e.visibility==='track'){
+        if(this._circleIntersectsRect(s.x,s.y,9*z,rect))out.push(e);
+        continue;
+      }
+      const a=this.assets.resolve(e.visual);if(!a)continue;
+      if(this._spriteIntersectsRect(a,e,s,rect,z))out.push(e);
+    }
+    return out;
+  }
+
+  entityIdsOnScreen({selectableOnly=false}={}){
+    const r=this.canvas.getBoundingClientRect();
+    return this.entitiesInRect({left:0,top:0,right:r.width,bottom:r.height,width:r.width,height:r.height},{selectableOnly}).map(e=>e.id);
+  }
+
+  _spriteBox(a,e,s,z){
+    const w=(a.width??86)*z,h=(a.height??70)*z;
+    const ax=(a.anchorX??(a.width??86)/2)*z,ay=(a.anchorY??(a.height??70))*z;
+    return {left:s.x-ax,top:s.y-ay,width:w,height:h,right:s.x-ax+w,bottom:s.y-ay+h};
+  }
+
+  _spritePixelHit(a,e,s,mx,my,z){
+    const b=this._spriteBox(a,e,s,z);
+    if(mx<b.left||mx>b.right||my<b.top||my>b.bottom)return false;
+    const ix=Math.floor((mx-b.left)/Math.max(.0001,b.width)*(a.width??86));
+    const iy=Math.floor((my-b.top)/Math.max(.0001,b.height)*(a.height??70));
+    return this._assetAlpha(a,ix,iy)>12;
+  }
+
+  _spriteIntersectsRect(a,e,s,rect,z){
+    const b=this._spriteBox(a,e,s,z);
+    const left=Math.max(b.left,rect.left),right=Math.min(b.right,rect.right),top=Math.max(b.top,rect.top),bottom=Math.min(b.bottom,rect.bottom);
+    if(right<left||bottom<top)return false;
+    const aw=a.width??86,ah=a.height??70;
+    const x0=Math.max(0,Math.floor((left-b.left)/Math.max(.0001,b.width)*aw));
+    const x1=Math.min(aw-1,Math.ceil((right-b.left)/Math.max(.0001,b.width)*aw));
+    const y0=Math.max(0,Math.floor((top-b.top)/Math.max(.0001,b.height)*ah));
+    const y1=Math.min(ah-1,Math.ceil((bottom-b.top)/Math.max(.0001,b.height)*ah));
+    const mask=this._assetAlphaMask(a);
+    for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(mask.alpha[y*mask.width+x]>12)return true;
+    return false;
+  }
+
+  _circleIntersectsRect(cx,cy,r,rect){
+    const x=Math.max(rect.left,Math.min(cx,rect.right)),y=Math.max(rect.top,Math.min(cy,rect.bottom));
+    return (cx-x)*(cx-x)+(cy-y)*(cy-y)<=r*r;
+  }
+
+  _assetAlpha(a,x,y){
+    const m=this._assetAlphaMask(a);
+    if(x<0||y<0||x>=m.width||y>=m.height)return 0;
+    return m.alpha[y*m.width+x];
+  }
+
+  _assetAlphaMask(a){
+    const image=a.image;
+    const cached=this._alphaMasks.get(image);if(cached)return cached;
+    const width=Math.max(1,Math.floor(a.width??image.width??86)),height=Math.max(1,Math.floor(a.height??image.height??70));
+    const c=document.createElement('canvas');c.width=width;c.height=height;
+    const x=c.getContext('2d',{willReadFrequently:true});x.clearRect(0,0,width,height);x.drawImage(image,0,0,width,height);
+    const rgba=x.getImageData(0,0,width,height).data,alpha=new Uint8Array(width*height);
+    for(let i=0,j=3;i<alpha.length;i++,j+=4)alpha[i]=rgba[j];
+    const result={width,height,alpha};this._alphaMasks.set(image,result);return result;
   }
 
   _entityScreen(e,w,h){ const p=this.iso.worldToIso(e.x,e.y,e.z??0); return this.camera.worldScreenToCanvas(p,w,h); }
@@ -72,6 +166,7 @@ export class IsoRenderer {
     if(this.flags.fog && extra.fog) this._drawFog(ctx,W,H,extra.fog);
     if(this.flags.sensors) this._drawSensors(ctx,W,H);
     if(extra.commandMarker) this._drawCommandMarker(ctx,W,H,extra.commandMarker);
+    if(extra.selectionBox) this._drawSelectionBox(ctx,extra.selectionBox);
   }
 
   _tileHeight(x,y){ return this.map?.tiles?.[y]?.[x]?.height??0; }
@@ -335,6 +430,16 @@ export class IsoRenderer {
     if(style.key) return {type:'graphic', key:style.key};
     if(style.value) return {type:'color', value:style.value};
     return null;
+  }
+
+
+  _drawSelectionBox(ctx,rect){
+    if(!rect)return;
+    const w=Math.max(0,rect.right-rect.left),h=Math.max(0,rect.bottom-rect.top);
+    ctx.save();
+    ctx.fillStyle='rgba(107,190,255,.10)';ctx.strokeStyle='rgba(150,218,255,.92)';ctx.lineWidth=1;
+    ctx.fillRect(rect.left,rect.top,w,h);ctx.strokeRect(rect.left+.5,rect.top+.5,Math.max(0,w-1),Math.max(0,h-1));
+    ctx.restore();
   }
 
   _drawCommandMarker(ctx,W,H,m){
